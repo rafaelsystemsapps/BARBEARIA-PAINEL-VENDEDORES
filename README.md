@@ -91,12 +91,16 @@ competência. **Idempotente** (índice único parcial: rodar 2× não duplica). 
 ## Testes de aceite
 
 ```bash
-npm run test:rls   # vendedor A não vê dados do vendedor B (via API)
-npm run build      # build de produção limpo
+npm run test:rls      # critério 2: vendedor A não vê dados do B (via API)
+npm run test:aceite   # critérios 3–7: comissões, faixas de setup, saldo/saque, idempotência
+npm run build         # build de produção limpo
 ```
 
-Demais critérios (comissões 30/40%, faixas de setup 20/30%, saldo/saque, sem
-comissão sem confirmação) são exercitados pelo `seed` e verificáveis nas telas.
+`test:aceite` valida contra os dados do seed: percentuais 30/40% congelados no
+fechamento, setup R$ 800,00 → 20% e R$ 800,01 → 30%, comissão exata na
+confirmação, ausência de comissão sem confirmação, saldo = entries disponíveis e
+`generate_monthly_charges` idempotente. Critério 1 (gate de aprovação) é
+verificável na UI: registre um vendedor e veja o bloqueio até a aprovação.
 
 ## Deploy (Vercel)
 
