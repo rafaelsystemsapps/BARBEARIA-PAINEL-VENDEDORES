@@ -17,9 +17,6 @@ export async function signIn(
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    if (error.code === "email_not_confirmed") {
-      return { error: "Confirme seu e-mail antes de entrar (verifique sua caixa de entrada)." };
-    }
     return { error: "E-mail ou senha inválidos." };
   }
   redirect("/");
@@ -61,12 +58,15 @@ export async function signUp(
     return { error: `Não foi possível concluir o cadastro: ${error.message}` };
   }
 
-  // Sessão criada = confirmação de e-mail desativada no projeto
+  // Sem confirmação de e-mail, o signUp já cria a sessão e o cadastro vai
+  // direto para o gate de aprovação do administrador.
   if (data.session) redirect("/aguardando-aprovacao");
 
+  // Fallback defensivo (só ocorre se a confirmação de e-mail for reativada
+  // no projeto Supabase): mantém a mensagem focada na aprovação do admin.
   return {
     success:
-      "Cadastro recebido! Confirme seu e-mail e aguarde a aprovação do administrador para acessar o painel.",
+      "Cadastro recebido! Aguarde a aprovação do administrador para acessar o painel.",
   };
 }
 
