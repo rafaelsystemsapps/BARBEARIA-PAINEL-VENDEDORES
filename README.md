@@ -57,9 +57,7 @@ webhook de gateway sem reescrever o resto.
 
 | Papel | E-mail | Senha |
 |---|---|---|
-| Admin | rafael.systemsapps@gmail.com | `Admin@2026!` |
-| Vendedor (João) | joao@parceiro.dev | `Vendedor@2026!` |
-| Vendedora (Maria) | maria@parceiro.dev | `Vendedor@2026!` |
+| Admin | admin@2026gmail.com | `Admin@2026` |
 | Pendente (Carlos) | carlos@parceiro.dev | `Vendedor@2026!` |
 
 > Troque a senha do admin após o primeiro login.
@@ -88,19 +86,17 @@ competência. **Idempotente** (índice único parcial: rodar 2× não duplica). 
   protegida por `CRON_SECRET`);
 - pelo botão **"Gerar cobranças do mês"** na tela admin de pagamentos.
 
-## Testes de aceite
+## Testes
 
 ```bash
-npm run test:rls      # critério 2: vendedor A não vê dados do B (via API)
-npm run test:aceite   # critérios 3–7: comissões, faixas de setup, saldo/saque, idempotência
 npm run build         # build de produção limpo
 ```
 
-`test:aceite` valida contra os dados do seed: percentuais 30/40% congelados no
-fechamento, setup R$ 800,00 → 20% e R$ 800,01 → 30%, comissão exata na
-confirmação, ausência de comissão sem confirmação, saldo = entries disponíveis e
-`generate_monthly_charges` idempotente. Critério 1 (gate de aprovação) é
-verificável na UI: registre um vendedor e veja o bloqueio até a aprovação.
+Os critérios de aceite do PRD (isolamento por RLS, percentuais de comissão
+congelados no fechamento, faixas de setup, saldo/saque e idempotência da geração
+de cobranças) são garantidos pelas policies e funções de negócio em
+`supabase/migrations` e verificáveis pela UI. Critério 1 (gate de aprovação):
+registre um vendedor e veja o bloqueio até a aprovação.
 
 ## Deploy (Vercel)
 

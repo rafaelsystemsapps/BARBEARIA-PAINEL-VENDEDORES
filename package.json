@@ -8,8 +8,6 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx --env-file=.env.local scripts/seed.ts",
-    "test:rls": "tsx --env-file=.env.local scripts/test-rls.ts",
-    "test:aceite": "tsx --env-file=.env.local scripts/test-aceite.ts",
     "db:push": "supabase db push"
   },
   "dependencies": {
