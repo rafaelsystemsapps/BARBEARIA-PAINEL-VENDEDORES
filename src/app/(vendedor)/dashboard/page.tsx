@@ -6,6 +6,7 @@ import type { Client, CommissionEntry } from "@/lib/types";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
 import { DemoLinkCard } from "@/components/demo-link-card";
+import { CopyButton } from "@/components/copy-button";
 import {
   Card,
   CardContent,
@@ -33,7 +34,10 @@ export default async function DashboardPage() {
         .eq("tipo", "setup")
         .eq("status", "aguardando")
         .eq("clients.seller_id", profile.id),
-      supabase.from("settings").select("value").eq("key", "demo_url").single(),
+      supabase
+        .from("settings")
+        .select("key, value")
+        .in("key", ["demo_url", "admin_pix_key"]),
       supabase
         .from("commission_entries")
         .select("*, clients(barbearia)")
@@ -62,7 +66,14 @@ export default async function DashboardPage() {
   );
 
   const recentes = (recentRes.data ?? []) as EntryWithClient[];
-  const demoUrl = demoRes.data?.value?.trim() || null;
+  const settings = new Map(
+    ((demoRes.data ?? []) as { key: string; value: string }[]).map((s) => [
+      s.key,
+      s.value,
+    ])
+  );
+  const demoUrl = settings.get("demo_url")?.trim() || null;
+  const adminPixKey = settings.get("admin_pix_key")?.trim() || null;
 
   return (
     <div className="space-y-6">
@@ -101,6 +112,20 @@ export default async function DashboardPage() {
           icon={TrendingUp}
         />
       </div>
+
+      {adminPixKey && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="min-w-0">
+              <p className="font-medium">Chave PIX para cobrança dos clientes</p>
+              <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                {adminPixKey}
+              </p>
+            </div>
+            <CopyButton value={adminPixKey} label="Copiar chave" />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <DemoLinkCard demoUrl={demoUrl} refCode={profile.ref_code} />
