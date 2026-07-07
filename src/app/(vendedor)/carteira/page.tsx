@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatDate } from "@/lib/format";
 import type { Client } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -38,15 +39,9 @@ export default async function CarteiraPage() {
       </div>
 
       {clients.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhum cliente na carteira ainda. Feche sua primeira venda na tela de
-            Leads.
-          </p>
-        </div>
+        <EmptyState message="Nenhum cliente na carteira ainda. Feche sua primeira venda na tela de Leads." />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
+        <DataTableCard>
             <TableHeader>
               <TableRow>
                 <TableHead>Barbearia</TableHead>
@@ -91,8 +86,7 @@ export default async function CarteiraPage() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </div>
+          </DataTableCard>
       )}
     </div>
   );

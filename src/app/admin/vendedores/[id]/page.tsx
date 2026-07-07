@@ -7,8 +7,9 @@ import { formatBRL, formatDate } from "@/lib/format";
 import type { Client, Profile } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -66,14 +67,9 @@ export default async function VendedorDetalhePage({
       </div>
 
       {clients.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Este vendedor ainda não fechou nenhum cliente.
-          </p>
-        </div>
+        <EmptyState message="Este vendedor ainda não fechou nenhum cliente." />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
+        <DataTableCard>
             <TableHeader>
               <TableRow>
                 <TableHead>Barbearia</TableHead>
@@ -112,8 +108,7 @@ export default async function VendedorDetalhePage({
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </div>
+          </DataTableCard>
       )}
     </div>
   );

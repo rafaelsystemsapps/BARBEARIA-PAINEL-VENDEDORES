@@ -9,6 +9,8 @@ import type { ActionState } from "@/lib/actions/auth";
 import type { Client, Profile } from "@/lib/types";
 import { formatBRL, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +29,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -79,14 +80,9 @@ export function VendedoresClient({
       </div>
 
       {sellers.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhum vendedor cadastrado ainda.
-          </p>
-        </div>
+        <EmptyState message="Nenhum vendedor cadastrado ainda." />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
+        <DataTableCard>
             <TableHeader>
               <TableRow>
                 <TableHead>Vendedor</TableHead>
@@ -179,8 +175,7 @@ export function VendedoresClient({
                 );
               })}
             </TableBody>
-          </Table>
-        </div>
+          </DataTableCard>
       )}
 
       <ApproveDialog seller={approving} onOpenChange={() => setApproving(null)} />

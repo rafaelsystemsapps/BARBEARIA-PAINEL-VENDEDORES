@@ -6,8 +6,9 @@ import type { Withdrawal } from "@/lib/types";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
 import { WithdrawalForm } from "./withdrawal-form";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -65,14 +66,9 @@ export default async function SaquesPage() {
         <div className="space-y-2">
           <h2 className="font-heading text-base font-semibold">Histórico</h2>
           {withdrawals.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                Nenhum saque solicitado ainda.
-              </p>
-            </div>
+            <EmptyState message="Nenhum saque solicitado ainda." />
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <Table>
+            <DataTableCard>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Solicitado em</TableHead>
@@ -104,8 +100,7 @@ export default async function SaquesPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </div>
+              </DataTableCard>
           )}
         </div>
       </div>

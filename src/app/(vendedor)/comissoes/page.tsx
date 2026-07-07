@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { formatBRL, formatCompetencia } from "@/lib/format";
 import type { CommissionEntry } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -53,12 +54,7 @@ export default async function ComissoesPage() {
       </div>
 
       {entries.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhuma comissão ainda. Assim que um pagamento for confirmado, ela
-            aparece aqui.
-          </p>
-        </div>
+        <EmptyState message="Nenhuma comissão ainda. Assim que um pagamento for confirmado, ela aparece aqui." />
       ) : (
         Array.from(byCompetencia.entries()).map(([competencia, list]) => {
           const total = list.reduce((s, e) => s + e.valor_cents, 0);
@@ -72,8 +68,7 @@ export default async function ComissoesPage() {
                   Total: <span className="text-primary">{formatBRL(total)}</span>
                 </p>
               </div>
-              <div className="overflow-x-auto rounded-lg border">
-                <Table>
+              <DataTableCard>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Cliente</TableHead>
@@ -120,8 +115,7 @@ export default async function ComissoesPage() {
                       );
                     })}
                   </TableBody>
-                </Table>
-              </div>
+              </DataTableCard>
             </section>
           );
         })

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import {
   Handshake,
@@ -11,6 +11,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
+import { useServerAction } from "@/lib/hooks/use-server-action";
 import { createLead, closeLead, updateLeadStatus } from "@/lib/actions/seller";
 import type { ActionState } from "@/lib/actions/auth";
 import type { Lead, LeadStatus } from "@/lib/types";
@@ -45,7 +48,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -96,16 +98,15 @@ export function LeadsClient({ leads }: { leads: Lead[] }) {
       </Tabs>
 
       {filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            {leads.length === 0
+        <EmptyState
+          message={
+            leads.length === 0
               ? "Nenhum lead ainda. Cadastre o primeiro contato de barbearia que você abordar."
-              : "Nenhum lead neste filtro."}
-          </p>
-        </div>
+              : "Nenhum lead neste filtro."
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
+        <DataTableCard>
             <TableHeader>
               <TableRow>
                 <TableHead>Contato</TableHead>
@@ -151,8 +152,7 @@ export function LeadsClient({ leads }: { leads: Lead[] }) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </div>
+        </DataTableCard>
       )}
 
       <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} />
@@ -171,13 +171,11 @@ function RowActions({
   onLose: () => void;
   onClose: () => void;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { isPending: pending, executeAction } = useServerAction();
 
   function move(status: "novo" | "em_negociacao") {
-    startTransition(async () => {
-      const res = await updateLeadStatus(lead.id, status);
-      if (res?.error) toast.error(res.error);
-      else toast.success("Lead atualizado.");
+    executeAction(() => updateLeadStatus(lead.id, status), {
+      successMessage: "Lead atualizado.",
     });
   }
 
@@ -290,18 +288,16 @@ function LoseLeadDialog({
   onOpenChange: () => void;
 }) {
   const [motivo, setMotivo] = useState("");
-  const [pending, startTransition] = useTransition();
+  const { isPending: pending, executeAction } = useServerAction();
 
   function submit() {
     if (!lead) return;
-    startTransition(async () => {
-      const res = await updateLeadStatus(lead.id, "perdido", motivo);
-      if (res?.error) toast.error(res.error);
-      else {
-        toast.success("Lead marcado como perdido.");
+    executeAction(() => updateLeadStatus(lead.id, "perdido", motivo), {
+      successMessage: "Lead marcado como perdido.",
+      onSuccess: () => {
         setMotivo("");
         onOpenChange();
-      }
+      },
     });
   }
 

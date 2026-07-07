@@ -7,6 +7,8 @@ import { setClientStatus } from "@/lib/actions/admin";
 import type { Client } from "@/lib/types";
 import { formatBRL, formatDate } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +24,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -56,12 +57,9 @@ export function ClientesClient({ clients }: { clients: ClientRow[] }) {
       </div>
 
       {clients.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">Nenhum cliente ainda.</p>
-        </div>
+        <EmptyState message="Nenhum cliente ainda." />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
+        <DataTableCard>
             <TableHeader>
               <TableRow>
                 <TableHead>Barbearia</TableHead>
@@ -143,8 +141,7 @@ export function ClientesClient({ clients }: { clients: ClientRow[] }) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </div>
+          </DataTableCard>
       )}
 
       <CancelDialog client={canceling} onOpenChange={() => setCanceling(null)} />

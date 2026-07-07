@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Banknote, CheckCircle2, XCircle } from "lucide-react";
-import { toast } from "sonner";
 import { payWithdrawal, refuseWithdrawal } from "@/lib/actions/admin";
 import type { Withdrawal } from "@/lib/types";
 import { formatBRL, formatDateTime } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 import { CopyButton } from "@/components/copy-button";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
+import { useServerAction } from "@/lib/hooks/use-server-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +27,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -60,11 +61,7 @@ export function SaquesClient({
       </div>
 
       {pending.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhuma solicitação pendente.
-          </p>
-        </div>
+        <EmptyState message="Nenhuma solicitação pendente." />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {pending.map((w) => (
@@ -118,45 +115,43 @@ export function SaquesClient({
         {history.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum saque processado.</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vendedor</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="hidden sm:table-cell">Chave PIX</TableHead>
-                  <TableHead className="hidden md:table-cell">Solicitado</TableHead>
-                  <TableHead>Status</TableHead>
+          <DataTableCard>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Vendedor</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="hidden sm:table-cell">Chave PIX</TableHead>
+                <TableHead className="hidden md:table-cell">Solicitado</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {history.map((w) => (
+                <TableRow key={w.id}>
+                  <TableCell className="font-medium">
+                    {w.profiles?.nome ?? "—"}
+                  </TableCell>
+                  <TableCell className="tabular text-right">
+                    {formatBRL(w.valor_cents)}
+                  </TableCell>
+                  <TableCell className="hidden max-w-44 truncate sm:table-cell text-muted-foreground">
+                    {w.pix_key}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    {formatDateTime(w.requested_at)}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={w.status} />
+                    {w.status === "recusado" && w.motivo_recusa && (
+                      <p className="mt-1 max-w-45 truncate text-xs text-muted-foreground">
+                        {w.motivo_recusa}
+                      </p>
+                    )}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.map((w) => (
-                  <TableRow key={w.id}>
-                    <TableCell className="font-medium">
-                      {w.profiles?.nome ?? "—"}
-                    </TableCell>
-                    <TableCell className="tabular text-right">
-                      {formatBRL(w.valor_cents)}
-                    </TableCell>
-                    <TableCell className="hidden max-w-44 truncate sm:table-cell text-muted-foreground">
-                      {w.pix_key}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {formatDateTime(w.requested_at)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={w.status} />
-                      {w.status === "recusado" && w.motivo_recusa && (
-                        <p className="mt-1 max-w-45 truncate text-xs text-muted-foreground">
-                          {w.motivo_recusa}
-                        </p>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </DataTableCard>
         )}
       </section>
 
@@ -173,17 +168,13 @@ function PayDialog({
   withdrawal: WithdrawalRow | null;
   onOpenChange: () => void;
 }) {
-  const [pending, startTransition] = useTransition();
+  const { isPending: pending, executeAction } = useServerAction();
 
   function pay() {
     if (!withdrawal) return;
-    startTransition(async () => {
-      const res = await payWithdrawal(withdrawal.id);
-      if (res?.error) toast.error(res.error);
-      else {
-        toast.success(res?.success ?? "Saque pago.");
-        onOpenChange();
-      }
+    executeAction(() => payWithdrawal(withdrawal.id), {
+      successMessage: "Saque pago.",
+      onSuccess: onOpenChange,
     });
   }
 
@@ -219,18 +210,16 @@ function RefuseDialog({
   onOpenChange: () => void;
 }) {
   const [motivo, setMotivo] = useState("");
-  const [pending, startTransition] = useTransition();
+  const { isPending: pending, executeAction } = useServerAction();
 
   function refuse() {
     if (!withdrawal) return;
-    startTransition(async () => {
-      const res = await refuseWithdrawal(withdrawal.id, motivo);
-      if (res?.error) toast.error(res.error);
-      else {
-        toast.success(res?.success ?? "Saque recusado.");
+    executeAction(() => refuseWithdrawal(withdrawal.id, motivo), {
+      successMessage: "Saque recusado.",
+      onSuccess: () => {
         setMotivo("");
         onOpenChange();
-      }
+      },
     });
   }
 

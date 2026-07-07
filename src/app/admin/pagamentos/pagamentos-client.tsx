@@ -1,9 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { AlertTriangle, BadgeCheck, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { confirmPayment, generateCharges } from "@/lib/actions/admin";
+import { EmptyState } from "@/components/empty-state";
+import { DataTableCard } from "@/components/data-table-card";
+import { useServerAction } from "@/lib/hooks/use-server-action";
 import type { ActionState } from "@/lib/actions/auth";
 import type { Payment } from "@/lib/types";
 import { formatBRL, formatCompetencia, formatDate } from "@/lib/format";
@@ -21,7 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -49,13 +51,11 @@ export function PagamentosClient({
   diasAlerta: number;
 }) {
   const [confirming, setConfirming] = useState<PaymentRow | null>(null);
-  const [generating, startGenerate] = useTransition();
+  const { isPending: generating, executeAction: runGenerateAction } = useServerAction();
 
   function runGenerate() {
-    startGenerate(async () => {
-      const res = await generateCharges();
-      if (res?.error) toast.error(res.error);
-      else toast.success(res?.success ?? "Cobranças geradas.");
+    runGenerateAction(generateCharges, {
+      successMessage: "Cobranças geradas.",
     });
   }
 
@@ -78,15 +78,9 @@ export function PagamentosClient({
       </div>
 
       {pending.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Nenhuma cobrança aguardando. Gere as cobranças do mês ou aguarde novos
-            fechamentos.
-          </p>
-        </div>
+        <EmptyState message="Nenhuma cobrança aguardando. Gere as cobranças do mês ou aguarde novos fechamentos." />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
+        <DataTableCard>
             <TableHeader>
               <TableRow>
                 <TableHead>Cliente</TableHead>
@@ -143,8 +137,7 @@ export function PagamentosClient({
                 );
               })}
             </TableBody>
-          </Table>
-        </div>
+          </DataTableCard>
       )}
 
       <section className="space-y-2">
@@ -156,8 +149,7 @@ export function PagamentosClient({
             Nenhum pagamento confirmado ainda.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
+          <DataTableCard>
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
@@ -192,8 +184,7 @@ export function PagamentosClient({
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
-          </div>
+          </DataTableCard>
         )}
       </section>
 
