@@ -19,7 +19,7 @@ export function useServerAction() {
         if (res?.error) {
           toast.error(res.error);
         } else {
-          const finalMsg = options?.successMessage ?? res?.success;
+          const finalMsg = res?.success ?? options?.successMessage;
           if (finalMsg) toast.success(finalMsg);
           options?.onSuccess?.(res);
         }
