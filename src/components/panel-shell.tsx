@@ -15,6 +15,7 @@ import {
   Store,
   UserRound,
   Users,
+  UsersRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -41,10 +42,16 @@ const SELLER_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Visão geral", icon: LayoutDashboard, exact: true },
   { href: "/admin/vendedores", label: "Vendedores", icon: Users },
+  { href: "/admin/gestores", label: "Gestores", icon: UsersRound },
   { href: "/admin/pagamentos", label: "Confirmar pagamentos", icon: BadgeCheck },
   { href: "/admin/clientes", label: "Clientes", icon: Store },
   { href: "/admin/saques", label: "Saques", icon: Banknote },
   { href: "/admin/config", label: "Configurações", icon: Settings },
+];
+
+const GESTOR_NAV: NavItem[] = [
+  { href: "/gestor", label: "Meu time", icon: UsersRound, exact: true },
+  { href: "/gestor/comissoes", label: "Comissões", icon: Coins },
 ];
 
 export function PanelShell({
@@ -52,13 +59,25 @@ export function PanelShell({
   userName,
   children,
 }: {
-  variant: "seller" | "admin";
+  variant: "seller" | "admin" | "gestor";
   userName: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const nav = variant === "admin" ? ADMIN_NAV : SELLER_NAV;
+  const nav =
+    variant === "admin"
+      ? ADMIN_NAV
+      : variant === "gestor"
+        ? GESTOR_NAV
+        : SELLER_NAV;
+
+  const variantLabel =
+    variant === "admin"
+      ? "Administração"
+      : variant === "gestor"
+        ? "Gestor"
+        : "Vendedor";
 
   const sidebar = (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -69,7 +88,7 @@ export function PanelShell({
         <div className="leading-tight">
           <p className="font-heading text-sm font-semibold">Painel de Parceiros</p>
           <p className="text-[11px] text-muted-foreground">
-            {variant === "admin" ? "Administração" : "Vendedor"}
+            {variantLabel}
           </p>
         </div>
       </div>

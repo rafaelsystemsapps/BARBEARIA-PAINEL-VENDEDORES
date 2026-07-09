@@ -8,6 +8,7 @@ import type { ActionState } from "@/lib/actions/auth";
 function revalidateAdmin() {
   revalidatePath("/admin");
   revalidatePath("/admin/vendedores");
+  revalidatePath("/admin/gestores");
   revalidatePath("/admin/pagamentos");
   revalidatePath("/admin/clientes");
   revalidatePath("/admin/saques");
@@ -193,4 +194,169 @@ export async function saveSettings(
   revalidatePath("/admin/config");
   revalidatePath("/dashboard");
   return { success: "Configurações salvas." };
+}
+
+// --- Gestores (times) ------------------------------------------
+
+const teamCodeSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(
+    /^[A-Z0-9][A-Z0-9-]{2,19}$/,
+    "Código do time deve ter 3–20 caracteres (letras, números e hífen)."
+  );
+
+const pctSchema = z.coerce.number().int().min(0).max(100);
+
+const createGestorSchema = z.object({
+  nome: z.string().trim().min(3, "Informe o nome do gestor."),
+  email: z.string().trim().email("E-mail inválido."),
+  whatsapp: z.string().trim().optional(),
+  team_code: teamCodeSchema,
+  override_recorrente_pct: pctSchema,
+  override_setup_pct: pctSchema,
+  password: z.string().min(8, "A senha provisória precisa ter 8+ caracteres."),
+});
+
+/**
+ * Cria um gestor. Usa a service role (admin) para criar o usuário já ativo
+ * — gestor não passa pelo fluxo de aprovação de vendedor. Requer
+ * SUPABASE_SERVICE_ROLE_KEY no ambiente do servidor.
+ */
+export async function createGestor(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = createGestorSchema.safeParse({
+    nome: formData.get("nome"),
+    email: formData.get("email"),
+    whatsapp: formData.get("whatsapp"),
+    team_code: formData.get("team_code"),
+    override_recorrente_pct: formData.get("override_recorrente_pct"),
+    override_setup_pct: formData.get("override_setup_pct"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const d = parsed.data;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!serviceKey || !url) {
+    return {
+      error:
+        "Configuração ausente: defina SUPABASE_SERVICE_ROLE_KEY no ambiente para criar gestores.",
+    };
+  }
+
+  const { createClient: createAdminClient } = await import(
+    "@supabase/supabase-js"
+  );
+  const admin = createAdminClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data: created, error: userErr } = await admin.auth.admin.createUser({
+    email: d.email,
+    password: d.password,
+    email_confirm: true,
+    user_metadata: { nome: d.nome, whatsapp: d.whatsapp ?? "" },
+  });
+  if (userErr) {
+    return { error: `Não foi possível criar o gestor: ${userErr.message}` };
+  }
+
+  // O trigger cria o profile como seller/pendente; promovemos a gestor ativo.
+  const { error: updErr } = await admin
+    .from("profiles")
+    .update({
+      role: "gestor",
+      status: "ativo",
+      team_code: d.team_code,
+      override_recorrente_pct: d.override_recorrente_pct,
+      override_setup_pct: d.override_setup_pct,
+    })
+    .eq("id", created.user.id);
+
+  if (updErr) {
+    if (updErr.code === "23505") {
+      return { error: "Este código de time já está em uso." };
+    }
+    return { error: `Gestor criado, mas falhou ao configurar: ${updErr.message}` };
+  }
+
+  revalidateAdmin();
+  return {
+    success: `Gestor ${d.nome} criado com o time ${d.team_code}.`,
+  };
+}
+
+/** Atualiza os percentuais de override de um gestor. */
+export async function updateGestorOverride(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const gestorId = String(formData.get("gestor_id") ?? "");
+  const rec = pctSchema.safeParse(formData.get("override_recorrente_pct"));
+  const setup = pctSchema.safeParse(formData.get("override_setup_pct"));
+  if (!rec.success || !setup.success) {
+    return { error: "Percentuais de override inválidos (0 a 100)." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      override_recorrente_pct: rec.data,
+      override_setup_pct: setup.data,
+    })
+    .eq("id", gestorId)
+    .eq("role", "gestor");
+
+  if (error) return { error: error.message };
+  revalidateAdmin();
+  return {
+    success: "Override atualizado — vale para vendas futuras do time.",
+  };
+}
+
+/** Pausa/reativa um gestor. */
+export async function setGestorStatus(
+  gestorId: string,
+  status: "ativo" | "pausado"
+): Promise<ActionState> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ status })
+    .eq("id", gestorId)
+    .eq("role", "gestor");
+
+  if (error) return { error: error.message };
+  revalidateAdmin();
+  return { success: status === "pausado" ? "Gestor pausado." : "Gestor reativado." };
+}
+
+/**
+ * Vincula, transfere ou desvincula um vendedor de um time.
+ * gestorId vazio/null desvincula (torna o vendedor direto).
+ */
+export async function setSellerTeam(
+  sellerId: string,
+  gestorId: string | null
+): Promise<ActionState> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ gestor_id: gestorId || null })
+    .eq("id", sellerId)
+    .eq("role", "seller");
+
+  if (error) return { error: error.message };
+  revalidateAdmin();
+  return {
+    success: gestorId
+      ? "Vendedor vinculado ao time."
+      : "Vendedor desvinculado (agora é vendedor direto).",
+  };
 }

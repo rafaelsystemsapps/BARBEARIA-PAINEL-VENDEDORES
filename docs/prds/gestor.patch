@@ -1,0 +1,1977 @@
+diff --git a/src/app/admin/gestores/gestores-client.tsx b/src/app/admin/gestores/gestores-client.tsx
+new file mode 100644
+index 0000000..e3519b5
+--- /dev/null
++++ b/src/app/admin/gestores/gestores-client.tsx
+@@ -0,0 +1,392 @@
++"use client";
++
++import { useActionState, useEffect, useState, useTransition } from "react";
++import { MoreHorizontal, Pause, Play, Plus, Percent } from "lucide-react";
++import { toast } from "sonner";
++import {
++  createGestor,
++  updateGestorOverride,
++  setGestorStatus,
++} from "@/lib/actions/admin";
++import type { ActionState } from "@/lib/actions/auth";
++import type { Client, Profile } from "@/lib/types";
++import { formatBRL } from "@/lib/format";
++import { StatusBadge } from "@/components/status-badge";
++import { EmptyState } from "@/components/empty-state";
++import { DataTableCard } from "@/components/data-table-card";
++import { CopyButton } from "@/components/copy-button";
++import { Button } from "@/components/ui/button";
++import { Input } from "@/components/ui/input";
++import { Label } from "@/components/ui/label";
++import { Alert, AlertDescription } from "@/components/ui/alert";
++import {
++  Dialog,
++  DialogContent,
++  DialogDescription,
++  DialogHeader,
++  DialogTitle,
++} from "@/components/ui/dialog";
++import {
++  DropdownMenu,
++  DropdownMenuContent,
++  DropdownMenuItem,
++  DropdownMenuTrigger,
++} from "@/components/ui/dropdown-menu";
++import {
++  TableBody,
++  TableCell,
++  TableHead,
++  TableHeader,
++  TableRow,
++} from "@/components/ui/table";
++
++type SellerLite = Pick<Profile, "id" | "nome" | "email" | "gestor_id" | "status">;
++type ClientLite = Pick<
++  Client,
++  "id" | "seller_id" | "gestor_id" | "status" | "mensalidade_cents"
++>;
++
++export function GestoresClient({
++  gestores,
++  sellers,
++  clients,
++}: {
++  gestores: Profile[];
++  sellers: SellerLite[];
++  clients: ClientLite[];
++}) {
++  const [creating, setCreating] = useState(false);
++  const [editing, setEditing] = useState<Profile | null>(null);
++  const [pending, startTransition] = useTransition();
++
++  function toggleStatus(g: Profile) {
++    const novo = g.status === "pausado" ? "ativo" : "pausado";
++    startTransition(async () => {
++      const res = await setGestorStatus(g.id, novo);
++      if (res?.error) toast.error(res.error);
++      else toast.success(res?.success ?? "Atualizado.");
++    });
++  }
++
++  const teamStats = (gestorId: string) => {
++    const timeSellers = sellers.filter((s) => s.gestor_id === gestorId);
++    // MRR do time = mensalidades ativas de clientes cujo snapshot aponta o gestor
++    const timeClients = clients.filter(
++      (c) => c.gestor_id === gestorId && c.status === "ativo"
++    );
++    return {
++      sellers: timeSellers.length,
++      mrr: timeClients.reduce((s, c) => s + c.mensalidade_cents, 0),
++      clientes: timeClients.length,
++    };
++  };
++
++  return (
++    <div className="space-y-6">
++      <div className="flex items-start justify-between gap-4">
++        <div>
++          <h1 className="font-heading text-2xl font-semibold tracking-tight">
++            Gestores
++          </h1>
++          <p className="mt-1 text-sm text-muted-foreground">
++            Crie gestores, defina o código do time e o percentual de override
++            pago sobre as vendas do time.
++          </p>
++        </div>
++        <Button onClick={() => setCreating(true)}>
++          <Plus className="size-4" />
++          Novo gestor
++        </Button>
++      </div>
++
++      {gestores.length === 0 ? (
++        <EmptyState message="Nenhum gestor cadastrado ainda." />
++      ) : (
++        <DataTableCard>
++          <TableHeader>
++            <TableRow>
++              <TableHead>Gestor</TableHead>
++              <TableHead>Código do time</TableHead>
++              <TableHead className="hidden sm:table-cell text-right">
++                Override
++              </TableHead>
++              <TableHead className="hidden md:table-cell text-right">
++                Bônus time
++              </TableHead>
++              <TableHead className="hidden lg:table-cell text-right">
++                Vendedores
++              </TableHead>
++              <TableHead className="hidden lg:table-cell text-right">
++                MRR do time
++              </TableHead>
++              <TableHead>Status</TableHead>
++              <TableHead className="w-10" />
++            </TableRow>
++          </TableHeader>
++          <TableBody>
++            {gestores.map((g) => {
++              const st = teamStats(g.id);
++              return (
++                <TableRow key={g.id}>
++                  <TableCell>
++                    <p className="font-medium">{g.nome || "—"}</p>
++                    <p className="text-xs text-muted-foreground">{g.email}</p>
++                  </TableCell>
++                  <TableCell>
++                    <span className="inline-flex items-center gap-1">
++                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
++                        {g.team_code}
++                      </code>
++                      {g.team_code && <CopyButton value={g.team_code} />}
++                    </span>
++                  </TableCell>
++                  <TableCell className="tabular hidden sm:table-cell text-right">
++                    {g.override_recorrente_pct}% / {g.override_setup_pct}%
++                  </TableCell>
++                  <TableCell className="tabular hidden md:table-cell text-right text-muted-foreground">
++                    {g.bonus_time_pct}% / {g.bonus_time_setup_pct}%
++                  </TableCell>
++                  <TableCell className="tabular hidden lg:table-cell text-right">
++                    {st.sellers}
++                  </TableCell>
++                  <TableCell className="tabular hidden lg:table-cell text-right">
++                    {formatBRL(st.mrr)}
++                  </TableCell>
++                  <TableCell>
++                    <StatusBadge status={g.status} />
++                  </TableCell>
++                  <TableCell>
++                    <DropdownMenu>
++                      <DropdownMenuTrigger asChild>
++                        <Button
++                          variant="ghost"
++                          size="icon"
++                          disabled={pending}
++                          aria-label="Ações"
++                        >
++                          <MoreHorizontal className="size-4" />
++                        </Button>
++                      </DropdownMenuTrigger>
++                      <DropdownMenuContent align="end">
++                        <DropdownMenuItem onClick={() => setEditing(g)}>
++                          <Percent className="size-4" />
++                          Editar override…
++                        </DropdownMenuItem>
++                        {g.status === "ativo" ? (
++                          <DropdownMenuItem onClick={() => toggleStatus(g)}>
++                            <Pause className="size-4" />
++                            Pausar
++                          </DropdownMenuItem>
++                        ) : (
++                          <DropdownMenuItem onClick={() => toggleStatus(g)}>
++                            <Play className="size-4" />
++                            Reativar
++                          </DropdownMenuItem>
++                        )}
++                      </DropdownMenuContent>
++                    </DropdownMenu>
++                  </TableCell>
++                </TableRow>
++              );
++            })}
++          </TableBody>
++        </DataTableCard>
++      )}
++
++      <CreateGestorDialog open={creating} onOpenChange={() => setCreating(false)} />
++      <EditOverrideDialog
++        gestor={editing}
++        onOpenChange={() => setEditing(null)}
++      />
++    </div>
++  );
++}
++
++function CreateGestorDialog({
++  open,
++  onOpenChange,
++}: {
++  open: boolean;
++  onOpenChange: () => void;
++}) {
++  const [state, formAction, pending] = useActionState<ActionState, FormData>(
++    createGestor,
++    null
++  );
++
++  useEffect(() => {
++    if (state?.success) {
++      toast.success(state.success);
++      onOpenChange();
++    }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [state]);
++
++  if (!open) return null;
++
++  return (
++    <Dialog open onOpenChange={onOpenChange}>
++      <DialogContent>
++        <DialogHeader>
++          <DialogTitle className="font-heading">Novo gestor</DialogTitle>
++          <DialogDescription>
++            O gestor recebe override sobre as vendas do time. Ele entra ativo e
++            usa a senha provisória para o primeiro acesso.
++          </DialogDescription>
++        </DialogHeader>
++        <form action={formAction} className="space-y-4">
++          <div className="space-y-2">
++            <Label htmlFor="g-nome">Nome</Label>
++            <Input id="g-nome" name="nome" required />
++          </div>
++          <div className="grid grid-cols-2 gap-3">
++            <div className="space-y-2">
++              <Label htmlFor="g-email">E-mail</Label>
++              <Input id="g-email" name="email" type="email" required />
++            </div>
++            <div className="space-y-2">
++              <Label htmlFor="g-whats">WhatsApp</Label>
++              <Input id="g-whats" name="whatsapp" placeholder="11 91234-5678" />
++            </div>
++          </div>
++          <div className="space-y-2">
++            <Label htmlFor="g-code">Código do time</Label>
++            <Input
++              id="g-code"
++              name="team_code"
++              placeholder="TIMECARLOS"
++              autoCapitalize="characters"
++              required
++            />
++          </div>
++          <div className="grid grid-cols-2 gap-3">
++            <div className="space-y-2">
++              <Label htmlFor="g-rec">Override recorrente (%)</Label>
++              <Input
++                id="g-rec"
++                name="override_recorrente_pct"
++                type="number"
++                min={0}
++                max={100}
++                defaultValue={10}
++                required
++              />
++            </div>
++            <div className="space-y-2">
++              <Label htmlFor="g-set">Override setup (%)</Label>
++              <Input
++                id="g-set"
++                name="override_setup_pct"
++                type="number"
++                min={0}
++                max={100}
++                defaultValue={5}
++                required
++              />
++            </div>
++          </div>
++          <div className="space-y-2">
++            <Label htmlFor="g-pass">Senha provisória (mín. 8)</Label>
++            <Input
++              id="g-pass"
++              name="password"
++              type="text"
++              minLength={8}
++              placeholder="Gestor@2026"
++              required
++            />
++          </div>
++
++          {state?.error && (
++            <Alert variant="destructive">
++              <AlertDescription>{state.error}</AlertDescription>
++            </Alert>
++          )}
++
++          <Button type="submit" className="w-full" disabled={pending}>
++            {pending ? "Criando..." : "Criar gestor"}
++          </Button>
++        </form>
++      </DialogContent>
++    </Dialog>
++  );
++}
++
++function EditOverrideDialog({
++  gestor,
++  onOpenChange,
++}: {
++  gestor: Profile | null;
++  onOpenChange: () => void;
++}) {
++  const [state, formAction, pending] = useActionState<ActionState, FormData>(
++    updateGestorOverride,
++    null
++  );
++
++  useEffect(() => {
++    if (state?.success) {
++      toast.success(state.success);
++      onOpenChange();
++    }
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [state]);
++
++  if (!gestor) return null;
++
++  return (
++    <Dialog open onOpenChange={onOpenChange}>
++      <DialogContent>
++        <DialogHeader>
++          <DialogTitle className="font-heading">
++            Override — {gestor.nome || gestor.email}
++          </DialogTitle>
++          <DialogDescription>
++            Percentual pago ao gestor por fora, sobre cada pagamento do time.
++            Vale para vendas futuras; clientes já fechados mantêm o percentual
++            do fechamento.
++          </DialogDescription>
++        </DialogHeader>
++        <form action={formAction} className="space-y-4">
++          <input type="hidden" name="gestor_id" value={gestor.id} />
++          <div className="grid grid-cols-2 gap-3">
++            <div className="space-y-2">
++              <Label htmlFor="e-rec">Recorrente (%)</Label>
++              <Input
++                id="e-rec"
++                name="override_recorrente_pct"
++                type="number"
++                min={0}
++                max={100}
++                defaultValue={gestor.override_recorrente_pct}
++                required
++              />
++            </div>
++            <div className="space-y-2">
++              <Label htmlFor="e-set">Setup (%)</Label>
++              <Input
++                id="e-set"
++                name="override_setup_pct"
++                type="number"
++                min={0}
++                max={100}
++                defaultValue={gestor.override_setup_pct}
++                required
++              />
++            </div>
++          </div>
++
++          {state?.error && (
++            <Alert variant="destructive">
++              <AlertDescription>{state.error}</AlertDescription>
++            </Alert>
++          )}
++
++          <Button type="submit" className="w-full" disabled={pending}>
++            {pending ? "Salvando..." : "Salvar override"}
++          </Button>
++        </form>
++      </DialogContent>
++    </Dialog>
++  );
++}
+diff --git a/src/app/admin/gestores/page.tsx b/src/app/admin/gestores/page.tsx
+new file mode 100644
+index 0000000..3482fd5
+--- /dev/null
++++ b/src/app/admin/gestores/page.tsx
+@@ -0,0 +1,42 @@
++import { requireAdmin } from "@/lib/auth";
++import { createClient } from "@/lib/supabase/server";
++import type { Client, Profile } from "@/lib/types";
++import { GestoresClient } from "./gestores-client";
++
++export const metadata = { title: "Gestores" };
++
++export default async function GestoresPage() {
++  await requireAdmin();
++  const supabase = await createClient();
++
++  const [gestoresRes, sellersRes, clientsRes] = await Promise.all([
++    supabase
++      .from("profiles")
++      .select("*")
++      .eq("role", "gestor")
++      .order("created_at", { ascending: false }),
++    supabase
++      .from("profiles")
++      .select("id, nome, email, gestor_id, status")
++      .eq("role", "seller"),
++    supabase.from("clients").select("id, seller_id, gestor_id, status, mensalidade_cents"),
++  ]);
++
++  return (
++    <GestoresClient
++      gestores={(gestoresRes.data ?? []) as Profile[]}
++      sellers={
++        (sellersRes.data ?? []) as Pick<
++          Profile,
++          "id" | "nome" | "email" | "gestor_id" | "status"
++        >[]
++      }
++      clients={
++        (clientsRes.data ?? []) as Pick<
++          Client,
++          "id" | "seller_id" | "gestor_id" | "status" | "mensalidade_cents"
++        >[]
++      }
++    />
++  );
++}
+diff --git a/src/app/admin/vendedores/page.tsx b/src/app/admin/vendedores/page.tsx
+index eec93b9..95d5995 100644
+--- a/src/app/admin/vendedores/page.tsx
++++ b/src/app/admin/vendedores/page.tsx
+@@ -9,13 +9,18 @@ export default async function VendedoresPage() {
+   await requireAdmin();
+   const supabase = await createClient();
+ 
+-  const [sellersRes, clientsRes] = await Promise.all([
++  const [sellersRes, clientsRes, gestoresRes] = await Promise.all([
+     supabase
+       .from("profiles")
+       .select("*")
+       .eq("role", "seller")
+       .order("created_at", { ascending: false }),
+     supabase.from("clients").select("id, seller_id, status, mensalidade_cents"),
++    supabase
++      .from("profiles")
++      .select("id, nome, email, team_code, status")
++      .eq("role", "gestor")
++      .order("nome"),
+   ]);
+ 
+   return (
+@@ -27,6 +32,12 @@ export default async function VendedoresPage() {
+           "id" | "seller_id" | "status" | "mensalidade_cents"
+         >[]
+       }
++      gestores={
++        (gestoresRes.data ?? []) as Pick<
++          Profile,
++          "id" | "nome" | "email" | "team_code" | "status"
++        >[]
++      }
+     />
+   );
+ }
+diff --git a/src/app/admin/vendedores/vendedores-client.tsx b/src/app/admin/vendedores/vendedores-client.tsx
+index 1f7ef8d..c3b74e6 100644
+--- a/src/app/admin/vendedores/vendedores-client.tsx
++++ b/src/app/admin/vendedores/vendedores-client.tsx
+@@ -2,9 +2,27 @@
+ 
+ import { useActionState, useEffect, useState, useTransition } from "react";
+ import Link from "next/link";
+-import { BadgeCheck, MoreHorizontal, Pause, Play, Store } from "lucide-react";
++import {
++  BadgeCheck,
++  MoreHorizontal,
++  Pause,
++  Play,
++  Store,
++  Users,
++} from "lucide-react";
+ import { toast } from "sonner";
+-import { approveSeller, setSellerStatus } from "@/lib/actions/admin";
++import {
++  approveSeller,
++  setSellerStatus,
++  setSellerTeam,
++} from "@/lib/actions/admin";
++import {
++  Select,
++  SelectContent,
++  SelectItem,
++  SelectTrigger,
++  SelectValue,
++} from "@/components/ui/select";
+ import type { ActionState } from "@/lib/actions/auth";
+ import type { Client, Profile } from "@/lib/types";
+ import { formatBRL, formatDate } from "@/lib/format";
+@@ -37,17 +55,23 @@ import {
+ } from "@/components/ui/table";
+ 
+ type ClientLite = Pick<Client, "id" | "seller_id" | "status" | "mensalidade_cents">;
++type GestorLite = Pick<Profile, "id" | "nome" | "email" | "team_code" | "status">;
+ 
+ export function VendedoresClient({
+   sellers,
+   clients,
++  gestores,
+ }: {
+   sellers: Profile[];
+   clients: ClientLite[];
++  gestores: GestorLite[];
+ }) {
+   const [approving, setApproving] = useState<Profile | null>(null);
++  const [linking, setLinking] = useState<Profile | null>(null);
+   const [pending, startTransition] = useTransition();
+ 
++  const gestorById = new Map(gestores.map((g) => [g.id, g]));
++
+   function toggleStatus(seller: Profile) {
+     const novo = seller.status === "pausado" ? "ativo" : "pausado";
+     startTransition(async () => {
+@@ -88,6 +112,7 @@ export function VendedoresClient({
+                 <TableHead>Vendedor</TableHead>
+                 <TableHead className="hidden md:table-cell">Contato</TableHead>
+                 <TableHead className="hidden sm:table-cell">Código</TableHead>
++                <TableHead className="hidden md:table-cell">Time / Gestor</TableHead>
+                 <TableHead>Status</TableHead>
+                 <TableHead className="hidden lg:table-cell text-right">
+                   Carteira
+@@ -118,6 +143,20 @@ export function VendedoresClient({
+                         "—"
+                       )}
+                     </TableCell>
++                    <TableCell className="hidden md:table-cell">
++                      {s.gestor_id && gestorById.has(s.gestor_id) ? (
++                        <div className="flex flex-col">
++                          <span className="font-medium">
++                            {gestorById.get(s.gestor_id)!.nome}
++                          </span>
++                          <code className="rounded bg-muted px-1.5 py-0.5 text-xs w-fit">
++                            {gestorById.get(s.gestor_id)!.team_code}
++                          </code>
++                        </div>
++                      ) : (
++                        <span className="text-muted-foreground">Direto</span>
++                      )}
++                    </TableCell>
+                     <TableCell>
+                       <StatusBadge status={s.status} />
+                     </TableCell>
+@@ -162,6 +201,10 @@ export function VendedoresClient({
+                               Reativar
+                             </DropdownMenuItem>
+                           )}
++                          <DropdownMenuItem onClick={() => setLinking(s)}>
++                            <Users className="size-4" />
++                            Gerenciar time…
++                          </DropdownMenuItem>
+                           <DropdownMenuItem asChild>
+                             <Link href={`/admin/vendedores/${s.id}`}>
+                               <Store className="size-4" />
+@@ -179,10 +222,86 @@ export function VendedoresClient({
+       )}
+ 
+       <ApproveDialog seller={approving} onOpenChange={() => setApproving(null)} />
++      <LinkTeamDialog
++        seller={linking}
++        gestores={gestores}
++        onOpenChange={() => setLinking(null)}
++      />
+     </div>
+   );
+ }
+ 
++function LinkTeamDialog({
++  seller,
++  gestores,
++  onOpenChange,
++}: {
++  seller: Profile | null;
++  gestores: GestorLite[];
++  onOpenChange: () => void;
++}) {
++  const [value, setValue] = useState<string>("none");
++  const [pending, startTransition] = useTransition();
++
++  useEffect(() => {
++    setValue(seller?.gestor_id ?? "none");
++  }, [seller]);
++
++  if (!seller) return null;
++
++  const activeGestores = gestores.filter((g) => g.status === "ativo");
++
++  function save() {
++    startTransition(async () => {
++      const res = await setSellerTeam(
++        seller!.id,
++        value === "none" ? null : value
++      );
++      if (res?.error) toast.error(res.error);
++      else {
++        toast.success(res?.success ?? "Atualizado.");
++        onOpenChange();
++      }
++    });
++  }
++
++  return (
++    <Dialog open onOpenChange={onOpenChange}>
++      <DialogContent>
++        <DialogHeader>
++          <DialogTitle className="font-heading">Time do vendedor</DialogTitle>
++          <DialogDescription>
++            {seller.nome || seller.email} — vincule a um gestor, transfira de
++            time ou deixe como vendedor direto. Vale para vendas futuras; os
++            clientes já fechados mantêm o gestor registrado no fechamento.
++          </DialogDescription>
++        </DialogHeader>
++        <div className="space-y-4">
++          <div className="space-y-2">
++            <Label>Gestor / time</Label>
++            <Select value={value} onValueChange={setValue}>
++              <SelectTrigger>
++                <SelectValue placeholder="Selecione" />
++              </SelectTrigger>
++              <SelectContent>
++                <SelectItem value="none">Sem time (vendedor direto)</SelectItem>
++                {activeGestores.map((g) => (
++                  <SelectItem key={g.id} value={g.id}>
++                    {g.nome} — {g.team_code}
++                  </SelectItem>
++                ))}
++              </SelectContent>
++            </Select>
++          </div>
++          <Button onClick={save} className="w-full" disabled={pending}>
++            {pending ? "Salvando..." : "Salvar vínculo"}
++          </Button>
++        </div>
++      </DialogContent>
++    </Dialog>
++  );
++}
++
+ function ApproveDialog({
+   seller,
+   onOpenChange,
+diff --git a/src/app/gestor/comissoes/page.tsx b/src/app/gestor/comissoes/page.tsx
+new file mode 100644
+index 0000000..89d18ee
+--- /dev/null
++++ b/src/app/gestor/comissoes/page.tsx
+@@ -0,0 +1,112 @@
++import { requireGestor } from "@/lib/auth";
++import { createClient } from "@/lib/supabase/server";
++import { formatBRL, formatCompetencia } from "@/lib/format";
++import type { CommissionEntry } from "@/lib/types";
++import { StatusBadge } from "@/components/status-badge";
++import { EmptyState } from "@/components/empty-state";
++import { DataTableCard } from "@/components/data-table-card";
++import {
++  TableBody,
++  TableCell,
++  TableHead,
++  TableHeader,
++  TableRow,
++} from "@/components/ui/table";
++
++export const metadata = { title: "Comissões" };
++
++type EntryRow = CommissionEntry & {
++  clients: { barbearia: string } | null;
++  payments: { valor_pago_cents: number | null } | null;
++};
++
++export default async function GestorComissoesPage() {
++  const gestor = await requireGestor();
++  const supabase = await createClient();
++
++  const { data } = await supabase
++    .from("commission_entries")
++    .select("*, clients(barbearia), payments(valor_pago_cents)")
++    .eq("seller_id", gestor.id)
++    .order("competencia", { ascending: false })
++    .order("created_at", { ascending: false });
++
++  const entries = (data ?? []) as unknown as EntryRow[];
++
++  const byCompetencia = new Map<string, EntryRow[]>();
++  for (const e of entries) {
++    const list = byCompetencia.get(e.competencia) ?? [];
++    list.push(e);
++    byCompetencia.set(e.competencia, list);
++  }
++
++  return (
++    <div className="space-y-6">
++      <div>
++        <h1 className="font-heading text-2xl font-semibold tracking-tight">
++          Comissões (override do time)
++        </h1>
++        <p className="mt-1 text-sm text-muted-foreground">
++          Seu override nasce junto com a comissão do vendedor, quando o
++          administrador confirma o pagamento do cliente.
++        </p>
++      </div>
++
++      {entries.length === 0 ? (
++        <EmptyState message="Nenhum override ainda. Assim que uma venda do time for paga e confirmada, ela aparece aqui." />
++      ) : (
++        Array.from(byCompetencia.entries()).map(([competencia, list]) => {
++          const total = list.reduce((s, e) => s + e.valor_cents, 0);
++          return (
++            <section key={competencia} className="space-y-2">
++              <div className="flex items-baseline justify-between">
++                <h2 className="font-heading text-base font-semibold capitalize">
++                  {formatCompetencia(competencia)}
++                </h2>
++                <p className="tabular text-sm text-muted-foreground">
++                  Total: <span className="text-primary">{formatBRL(total)}</span>
++                </p>
++              </div>
++              <DataTableCard>
++                <TableHeader>
++                  <TableRow>
++                    <TableHead>Cliente</TableHead>
++                    <TableHead>Tipo</TableHead>
++                    <TableHead className="hidden sm:table-cell text-right">
++                      Valor pago
++                    </TableHead>
++                    <TableHead className="text-right">Override</TableHead>
++                    <TableHead>Status</TableHead>
++                  </TableRow>
++                </TableHeader>
++                <TableBody>
++                  {list.map((e) => (
++                    <TableRow key={e.id}>
++                      <TableCell className="font-medium">
++                        {e.clients?.barbearia ?? "—"}
++                      </TableCell>
++                      <TableCell className="text-muted-foreground">
++                        {e.tipo === "setup" ? "Setup" : "Mensalidade"}
++                      </TableCell>
++                      <TableCell className="tabular hidden sm:table-cell text-right text-muted-foreground">
++                        {e.payments?.valor_pago_cents
++                          ? formatBRL(e.payments.valor_pago_cents)
++                          : "—"}
++                      </TableCell>
++                      <TableCell className="tabular text-right font-medium text-primary">
++                        {formatBRL(e.valor_cents)}
++                      </TableCell>
++                      <TableCell>
++                        <StatusBadge status={e.status} />
++                      </TableCell>
++                    </TableRow>
++                  ))}
++                </TableBody>
++              </DataTableCard>
++            </section>
++          );
++        })
++      )}
++    </div>
++  );
++}
+diff --git a/src/app/gestor/layout.tsx b/src/app/gestor/layout.tsx
+new file mode 100644
+index 0000000..d9cb713
+--- /dev/null
++++ b/src/app/gestor/layout.tsx
+@@ -0,0 +1,16 @@
++import { requireGestor } from "@/lib/auth";
++import { PanelShell } from "@/components/panel-shell";
++
++export default async function GestorLayout({
++  children,
++}: {
++  children: React.ReactNode;
++}) {
++  const profile = await requireGestor();
++
++  return (
++    <PanelShell variant="gestor" userName={profile.nome || profile.email}>
++      {children}
++    </PanelShell>
++  );
++}
+diff --git a/src/app/gestor/page.tsx b/src/app/gestor/page.tsx
+new file mode 100644
+index 0000000..34591d0
+--- /dev/null
++++ b/src/app/gestor/page.tsx
+@@ -0,0 +1,140 @@
++import { requireGestor } from "@/lib/auth";
++import { createClient } from "@/lib/supabase/server";
++import { formatBRL } from "@/lib/format";
++import type { Client, Profile } from "@/lib/types";
++import { StatCard } from "@/components/stat-card";
++import { StatusBadge } from "@/components/status-badge";
++import { EmptyState } from "@/components/empty-state";
++import { DataTableCard } from "@/components/data-table-card";
++import { CopyButton } from "@/components/copy-button";
++import {
++  TableBody,
++  TableCell,
++  TableHead,
++  TableHeader,
++  TableRow,
++} from "@/components/ui/table";
++
++export const metadata = { title: "Meu time" };
++
++export default async function GestorHome() {
++  const gestor = await requireGestor();
++  const supabase = await createClient();
++
++  const [sellersRes, clientsRes, balanceRes, entriesRes] = await Promise.all([
++    supabase
++      .from("profiles")
++      .select("id, nome, email, status")
++      .eq("gestor_id", gestor.id),
++    supabase
++      .from("clients")
++      .select("id, seller_id, status, mensalidade_cents")
++      .eq("gestor_id", gestor.id),
++    supabase.rpc("seller_balance"),
++    supabase
++      .from("commission_entries")
++      .select("valor_cents, competencia")
++      .eq("seller_id", gestor.id),
++  ]);
++
++  const sellers = (sellersRes.data ?? []) as Pick<
++    Profile,
++    "id" | "nome" | "email" | "status"
++  >[];
++  const clients = (clientsRes.data ?? []) as Pick<
++    Client,
++    "id" | "seller_id" | "status" | "mensalidade_cents"
++  >[];
++  const saldo = Number(balanceRes.data ?? 0);
++
++  const ativos = clients.filter((c) => c.status === "ativo");
++  const mrr = ativos.reduce((s, c) => s + c.mensalidade_cents, 0);
++
++  const competenciaAtual = new Date().toISOString().slice(0, 7);
++  const overrideMes = ((entriesRes.data ?? []) as { valor_cents: number; competencia: string }[])
++    .filter((e) => e.competencia.startsWith(competenciaAtual))
++    .reduce((s, e) => s + e.valor_cents, 0);
++
++  const sellerName = (id: string) =>
++    sellers.find((s) => s.id === id)?.nome ?? "—";
++
++  return (
++    <div className="space-y-6">
++      <div className="flex flex-wrap items-start justify-between gap-4">
++        <div>
++          <h1 className="font-heading text-2xl font-semibold tracking-tight">
++            Meu time
++          </h1>
++          <p className="mt-1 text-sm text-muted-foreground">
++            Acompanhe os vendedores do time e o override gerado pelas vendas
++            deles.
++          </p>
++        </div>
++        {gestor.team_code && (
++          <div className="rounded-lg border bg-card px-4 py-2">
++            <p className="text-xs text-muted-foreground">Código do time</p>
++            <p className="flex items-center gap-2 font-heading font-semibold">
++              <code className="rounded bg-muted px-1.5 py-0.5 text-sm">
++                {gestor.team_code}
++              </code>
++              <CopyButton value={gestor.team_code} />
++            </p>
++          </div>
++        )}
++      </div>
++
++      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
++        <StatCard label="Saldo disponível" value={formatBRL(saldo)} />
++        <StatCard label="Override do mês" value={formatBRL(overrideMes)} />
++        <StatCard label="Vendedores no time" value={String(sellers.length)} />
++        <StatCard label="MRR do time" value={formatBRL(mrr)} />
++      </div>
++
++      {sellers.length === 0 ? (
++        <EmptyState message="Nenhum vendedor no time ainda. Compartilhe seu código para que vendedores entrem no seu time." />
++      ) : (
++        <DataTableCard>
++          <TableHeader>
++            <TableRow>
++              <TableHead>Vendedor</TableHead>
++              <TableHead className="hidden sm:table-cell">Contato</TableHead>
++              <TableHead className="text-right">Clientes ativos</TableHead>
++              <TableHead className="hidden lg:table-cell text-right">
++                MRR gerado
++              </TableHead>
++              <TableHead>Status</TableHead>
++            </TableRow>
++          </TableHeader>
++          <TableBody>
++            {sellers.map((s) => {
++              const carteira = ativos.filter((c) => c.seller_id === s.id);
++              const sellerMrr = carteira.reduce(
++                (sum, c) => sum + c.mensalidade_cents,
++                0
++              );
++              return (
++                <TableRow key={s.id}>
++                  <TableCell className="font-medium">
++                    {s.nome || sellerName(s.id)}
++                  </TableCell>
++                  <TableCell className="hidden sm:table-cell text-muted-foreground">
++                    {s.email}
++                  </TableCell>
++                  <TableCell className="tabular text-right">
++                    {carteira.length}
++                  </TableCell>
++                  <TableCell className="tabular hidden lg:table-cell text-right">
++                    {formatBRL(sellerMrr)}
++                  </TableCell>
++                  <TableCell>
++                    <StatusBadge status={s.status} />
++                  </TableCell>
++                </TableRow>
++              );
++            })}
++          </TableBody>
++        </DataTableCard>
++      )}
++    </div>
++  );
++}
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+index b6e2a11..9b86132 100644
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -5,5 +5,11 @@ export default async function Home() {
+   const profile = await getProfile();
+   if (!profile) redirect("/login");
+   if (profile.status !== "ativo") redirect("/aguardando-aprovacao");
+-  redirect(profile.role === "admin" ? "/admin" : "/dashboard");
++  redirect(
++    profile.role === "admin"
++      ? "/admin"
++      : profile.role === "gestor"
++        ? "/gestor"
++        : "/dashboard"
++  );
+ }
+diff --git a/src/app/registro/page.tsx b/src/app/registro/page.tsx
+index 93671dd..fc05bff 100644
+--- a/src/app/registro/page.tsx
++++ b/src/app/registro/page.tsx
+@@ -88,6 +88,38 @@ export default function RegistroPage() {
+                     required
+                   />
+                 </div>
++                <div className="space-y-2">
++                  <Label htmlFor="team_code">
++                    Código do time{" "}
++                    <span className="text-muted-foreground">(opcional)</span>
++                  </Label>
++                  <Input
++                    id="team_code"
++                    name="team_code"
++                    placeholder="Ex.: TIMECARLOS"
++                    autoCapitalize="characters"
++                  />
++                  <p className="text-xs text-muted-foreground">
++                    Recebeu um código de um gestor? Informe aqui para entrar no
++                    time dele.
++                  </p>
++                </div>
++                <div className="space-y-2">
++                  <Label htmlFor="team_code">
++                    Código do time{" "}
++                    <span className="text-muted-foreground">(opcional)</span>
++                  </Label>
++                  <Input
++                    id="team_code"
++                    name="team_code"
++                    placeholder="Ex.: TIMECARLOS"
++                    autoCapitalize="characters"
++                  />
++                  <p className="text-xs text-muted-foreground">
++                    Recebeu um código de um gestor? Informe aqui para entrar no
++                    time dele. Deixe em branco se não tiver.
++                  </p>
++                </div>
+ 
+                 {state?.error && (
+                   <Alert variant="destructive">
+diff --git a/src/components/panel-shell.tsx b/src/components/panel-shell.tsx
+index 2153228..09cd41c 100644
+--- a/src/components/panel-shell.tsx
++++ b/src/components/panel-shell.tsx
+@@ -15,6 +15,8 @@ import {
+   Store,
+   UserRound,
+   Users,
++  UsersRound,
++  Percent,
+   X,
+   type LucideIcon,
+ } from "lucide-react";
+@@ -41,24 +43,46 @@ const SELLER_NAV: NavItem[] = [
+ const ADMIN_NAV: NavItem[] = [
+   { href: "/admin", label: "Visão geral", icon: LayoutDashboard, exact: true },
+   { href: "/admin/vendedores", label: "Vendedores", icon: Users },
++  { href: "/admin/gestores", label: "Gestores", icon: UsersRound },
+   { href: "/admin/pagamentos", label: "Confirmar pagamentos", icon: BadgeCheck },
+   { href: "/admin/clientes", label: "Clientes", icon: Store },
+   { href: "/admin/saques", label: "Saques", icon: Banknote },
+   { href: "/admin/config", label: "Configurações", icon: Settings },
+ ];
+ 
++const GESTOR_NAV: NavItem[] = [
++  { href: "/gestor", label: "Meu time", icon: UsersRound, exact: true },
++  { href: "/gestor/vendas", label: "Vendas do time", icon: Store },
++  { href: "/gestor/comissoes", label: "Comissões", icon: Coins },
++  { href: "/gestor/bonificacao", label: "Bonificação", icon: Percent },
++  { href: "/gestor/saques", label: "Saques", icon: Banknote },
++  { href: "/gestor/perfil", label: "Perfil", icon: UserRound },
++];
++
+ export function PanelShell({
+   variant,
+   userName,
+   children,
+ }: {
+-  variant: "seller" | "admin";
++  variant: "seller" | "admin" | "gestor";
+   userName: string;
+   children: React.ReactNode;
+ }) {
+   const pathname = usePathname();
+   const [open, setOpen] = useState(false);
+-  const nav = variant === "admin" ? ADMIN_NAV : SELLER_NAV;
++  const nav =
++    variant === "admin"
++      ? ADMIN_NAV
++      : variant === "gestor"
++        ? GESTOR_NAV
++        : SELLER_NAV;
++
++  const variantLabel =
++    variant === "admin"
++      ? "Administração"
++      : variant === "gestor"
++        ? "Gestor"
++        : "Vendedor";
+ 
+   const sidebar = (
+     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+@@ -69,7 +93,7 @@ export function PanelShell({
+         <div className="leading-tight">
+           <p className="font-heading text-sm font-semibold">Painel de Parceiros</p>
+           <p className="text-[11px] text-muted-foreground">
+-            {variant === "admin" ? "Administração" : "Vendedor"}
++            {variantLabel}
+           </p>
+         </div>
+       </div>
+diff --git a/src/lib/actions/admin.ts b/src/lib/actions/admin.ts
+index 90ecb2f..1b93074 100644
+--- a/src/lib/actions/admin.ts
++++ b/src/lib/actions/admin.ts
+@@ -8,6 +8,7 @@ import type { ActionState } from "@/lib/actions/auth";
+ function revalidateAdmin() {
+   revalidatePath("/admin");
+   revalidatePath("/admin/vendedores");
++  revalidatePath("/admin/gestores");
+   revalidatePath("/admin/pagamentos");
+   revalidatePath("/admin/clientes");
+   revalidatePath("/admin/saques");
+@@ -194,3 +195,168 @@ export async function saveSettings(
+   revalidatePath("/dashboard");
+   return { success: "Configurações salvas." };
+ }
++
++// --- Gestores (times) ------------------------------------------
++
++const teamCodeSchema = z
++  .string()
++  .trim()
++  .toUpperCase()
++  .regex(
++    /^[A-Z0-9][A-Z0-9-]{2,19}$/,
++    "Código do time deve ter 3–20 caracteres (letras, números e hífen)."
++  );
++
++const pctSchema = z.coerce.number().int().min(0).max(100);
++
++const createGestorSchema = z.object({
++  nome: z.string().trim().min(3, "Informe o nome do gestor."),
++  email: z.string().trim().email("E-mail inválido."),
++  whatsapp: z.string().trim().optional(),
++  team_code: teamCodeSchema,
++  override_recorrente_pct: pctSchema,
++  override_setup_pct: pctSchema,
++  password: z.string().min(8, "A senha provisória precisa ter 8+ caracteres."),
++});
++
++/**
++ * Cria um gestor. Usa a service role (admin) para criar o usuário já ativo
++ * — gestor não passa pelo fluxo de aprovação de vendedor. Requer
++ * SUPABASE_SERVICE_ROLE_KEY no ambiente do servidor.
++ */
++export async function createGestor(
++  _prev: ActionState,
++  formData: FormData
++): Promise<ActionState> {
++  const parsed = createGestorSchema.safeParse({
++    nome: formData.get("nome"),
++    email: formData.get("email"),
++    whatsapp: formData.get("whatsapp"),
++    team_code: formData.get("team_code"),
++    override_recorrente_pct: formData.get("override_recorrente_pct"),
++    override_setup_pct: formData.get("override_setup_pct"),
++    password: formData.get("password"),
++  });
++  if (!parsed.success) return { error: parsed.error.issues[0].message };
++
++  const d = parsed.data;
++  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
++  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
++  if (!serviceKey || !url) {
++    return {
++      error:
++        "Configuração ausente: defina SUPABASE_SERVICE_ROLE_KEY no ambiente para criar gestores.",
++    };
++  }
++
++  const { createClient: createAdminClient } = await import(
++    "@supabase/supabase-js"
++  );
++  const admin = createAdminClient(url, serviceKey, {
++    auth: { autoRefreshToken: false, persistSession: false },
++  });
++
++  const { data: created, error: userErr } = await admin.auth.admin.createUser({
++    email: d.email,
++    password: d.password,
++    email_confirm: true,
++    user_metadata: { nome: d.nome, whatsapp: d.whatsapp ?? "" },
++  });
++  if (userErr) {
++    return { error: `Não foi possível criar o gestor: ${userErr.message}` };
++  }
++
++  // O trigger cria o profile como seller/pendente; promovemos a gestor ativo.
++  const { error: updErr } = await admin
++    .from("profiles")
++    .update({
++      role: "gestor",
++      status: "ativo",
++      team_code: d.team_code,
++      override_recorrente_pct: d.override_recorrente_pct,
++      override_setup_pct: d.override_setup_pct,
++    })
++    .eq("id", created.user.id);
++
++  if (updErr) {
++    if (updErr.code === "23505") {
++      return { error: "Este código de time já está em uso." };
++    }
++    return { error: `Gestor criado, mas falhou ao configurar: ${updErr.message}` };
++  }
++
++  revalidateAdmin();
++  return {
++    success: `Gestor ${d.nome} criado com o time ${d.team_code}.`,
++  };
++}
++
++/** Atualiza os percentuais de override de um gestor. */
++export async function updateGestorOverride(
++  _prev: ActionState,
++  formData: FormData
++): Promise<ActionState> {
++  const gestorId = String(formData.get("gestor_id") ?? "");
++  const rec = pctSchema.safeParse(formData.get("override_recorrente_pct"));
++  const setup = pctSchema.safeParse(formData.get("override_setup_pct"));
++  if (!rec.success || !setup.success) {
++    return { error: "Percentuais de override inválidos (0 a 100)." };
++  }
++
++  const supabase = await createClient();
++  const { error } = await supabase
++    .from("profiles")
++    .update({
++      override_recorrente_pct: rec.data,
++      override_setup_pct: setup.data,
++    })
++    .eq("id", gestorId)
++    .eq("role", "gestor");
++
++  if (error) return { error: error.message };
++  revalidateAdmin();
++  return {
++    success: "Override atualizado — vale para vendas futuras do time.",
++  };
++}
++
++/** Pausa/reativa um gestor. */
++export async function setGestorStatus(
++  gestorId: string,
++  status: "ativo" | "pausado"
++): Promise<ActionState> {
++  const supabase = await createClient();
++  const { error } = await supabase
++    .from("profiles")
++    .update({ status })
++    .eq("id", gestorId)
++    .eq("role", "gestor");
++
++  if (error) return { error: error.message };
++  revalidateAdmin();
++  return { success: status === "pausado" ? "Gestor pausado." : "Gestor reativado." };
++}
++
++/**
++ * Vincula, transfere ou desvincula um vendedor de um time.
++ * gestorId vazio/null desvincula (torna o vendedor direto).
++ */
++export async function setSellerTeam(
++  sellerId: string,
++  gestorId: string | null
++): Promise<ActionState> {
++  const supabase = await createClient();
++  const { error } = await supabase
++    .from("profiles")
++    .update({ gestor_id: gestorId || null })
++    .eq("id", sellerId)
++    .eq("role", "seller");
++
++  if (error) return { error: error.message };
++  revalidateAdmin();
++  return {
++    success: gestorId
++      ? "Vendedor vinculado ao time."
++      : "Vendedor desvinculado (agora é vendedor direto).",
++  };
++}
+diff --git a/src/lib/actions/auth.ts b/src/lib/actions/auth.ts
+index 2e456e2..1d8a472 100644
+--- a/src/lib/actions/auth.ts
++++ b/src/lib/actions/auth.ts
+@@ -27,6 +27,7 @@ const signUpSchema = z.object({
+   email: z.string().trim().email("E-mail inválido."),
+   whatsapp: z.string().trim().min(10, "Informe o WhatsApp com DDD."),
+   password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres."),
++  team_code: z.string().trim().optional(),
+ });
+ 
+ export async function signUp(
+@@ -38,12 +39,13 @@ export async function signUp(
+     email: formData.get("email"),
+     whatsapp: formData.get("whatsapp"),
+     password: formData.get("password"),
++    team_code: formData.get("team_code"),
+   });
+   if (!parsed.success) {
+     return { error: parsed.error.issues[0].message };
+   }
+ 
+-  const { nome, email, whatsapp, password } = parsed.data;
++  const { nome, email, whatsapp, password, team_code } = parsed.data;
+   const supabase = await createClient();
+   const { data, error } = await supabase.auth.signUp({
+     email,
+@@ -58,6 +60,20 @@ export async function signUp(
+     return { error: `Não foi possível concluir o cadastro: ${error.message}` };
+   }
+ 
++  // Se informou código de time e já há sessão, tenta vincular ao gestor.
++  // Código inválido NÃO bloqueia o cadastro — apenas não vincula.
++  if (data.session && team_code) {
++    const { error: teamErr } = await supabase.rpc("join_team", {
++      p_team_code: team_code,
++    });
++    if (teamErr) {
++      return {
++        error:
++          "Cadastro criado, mas o código de time é inválido. Peça o código correto ao seu gestor — o administrador também pode vincular você depois. Faça login para continuar.",
++      };
++    }
++  }
++
+   // Sem confirmação de e-mail, o signUp já cria a sessão e o cadastro vai
+   // direto para o gate de aprovação do administrador.
+   if (data.session) redirect("/aguardando-aprovacao");
+diff --git a/src/lib/auth.ts b/src/lib/auth.ts
+index 8bf6d4a..e1214f5 100644
+--- a/src/lib/auth.ts
++++ b/src/lib/auth.ts
+@@ -23,6 +23,17 @@ export async function requireSeller(): Promise<Profile> {
+   const profile = await getProfile();
+   if (!profile) redirect("/login");
+   if (profile.role === "admin") redirect("/admin");
++  if (profile.role === "gestor") redirect("/gestor");
++  if (profile.status !== "ativo") redirect("/aguardando-aprovacao");
++  return profile;
++}
++
++/** Garante gestor ativo; redireciona caso contrário. */
++export async function requireGestor(): Promise<Profile> {
++  const profile = await getProfile();
++  if (!profile) redirect("/login");
++  if (profile.role === "admin") redirect("/admin");
++  if (profile.role !== "gestor") redirect("/");
+   if (profile.status !== "ativo") redirect("/aguardando-aprovacao");
+   return profile;
+ }
+diff --git a/src/lib/types.ts b/src/lib/types.ts
+index b71b6a6..8d53dd8 100644
+--- a/src/lib/types.ts
++++ b/src/lib/types.ts
+@@ -1,8 +1,9 @@
+ // Tipos espelhando o schema do banco (supabase/migrations).
+ // Valores monetários sempre em centavos (number inteiro).
+ 
+-export type Role = "admin" | "seller";
++export type Role = "admin" | "gestor" | "seller";
+ export type ProfileStatus = "pendente" | "ativo" | "pausado";
++export type EntryOrigem = "venda_propria" | "override_time";
+ export type LeadStatus = "novo" | "em_negociacao" | "fechado" | "perdido";
+ export type ClientStatus = "aguardando_setup" | "ativo" | "inadimplente" | "cancelado";
+ export type PaymentTipo = "setup" | "mensalidade";
+@@ -20,6 +21,13 @@ export interface Profile {
+   pix_name: string | null;
+   ref_code: string | null;
+   status: ProfileStatus;
++  // Camada de gestor (times)
++  gestor_id: string | null;
++  team_code: string | null;
++  override_recorrente_pct: number;
++  override_setup_pct: number;
++  bonus_time_pct: number;
++  bonus_time_setup_pct: number;
+   created_at: string;
+   updated_at: string;
+ }
+@@ -50,6 +58,9 @@ export interface Client {
+   setup_cents: number | null;
+   pct_recorrente: number;
+   pct_setup: number | null;
++  gestor_id: string | null;
++  pct_gestor_recorrente: number | null;
++  pct_gestor_setup: number | null;
+   status: ClientStatus;
+   closed_at: string;
+   created_at: string;
+@@ -78,6 +89,7 @@ export interface CommissionEntry {
+   tipo: PaymentTipo;
+   competencia: string;
+   valor_cents: number;
++  origem: EntryOrigem;
+   status: EntryStatus;
+   withdrawal_id: string | null;
+   created_at: string;
+diff --git a/supabase/migrations/20260708120001_gestor.sql b/supabase/migrations/20260708120001_gestor.sql
+new file mode 100644
+index 0000000..d841a27
+--- /dev/null
++++ b/supabase/migrations/20260708120001_gestor.sql
+@@ -0,0 +1,588 @@
++-- =============================================================
++-- Painel de Vendedores — Patch: Camada de Gestor (times)
++-- =============================================================
++-- Adiciona o papel 'gestor'. Cada gestor tem um team_code (tipo
++-- cupom) e um override percentual definido pelo admin. O seller
++-- entra num time informando o team_code no cadastro.
++--
++-- MODELO DO "BOLO FIXO" (não pode quebrar os números):
++--   * O seller SEMPRE recebe o piso da tabela (30/40 recorrente,
++--     20/30 setup). Ter gestor nunca reduz a comissão do seller.
++--   * O override do gestor é pago POR FORA, sobre o mesmo valor
++--     pago pelo cliente, nunca descontado do seller.
++--   * Bonificação = o gestor cede pontos do PRÓPRIO override ao
++--     time. seller + gestor permanece constante = piso + override.
++--   * teto_comissao_pct (settings) limita seller + gestor.
++--   * Snapshot no fechamento: gestor_id e percentuais congelam no
++--     cliente. Mudanças futuras não afetam clientes já fechados.
++--   * Mesmo gatilho: confirm_payment() gera as DUAS entries na
++--     mesma transação. Cliente não pagou = ninguém ganha.
++-- =============================================================
++
++-- 1) Enums: novo papel e nova origem de comissão ---------------
++alter type public.user_role add value if not exists 'gestor';
++
++-- Distingue no extrato a comissão de venda própria x override.
++do $$
++begin
++  if not exists (select 1 from pg_type where typname = 'entry_origem') then
++    create type public.entry_origem as enum ('venda_propria', 'override_time');
++  end if;
++end$$;
++
++-- 2) settings: teto de comissão -------------------------------
++insert into public.settings (key, value)
++values ('teto_comissao_pct', '60')
++on conflict (key) do nothing;
++
++-- 3) profiles: campos de time e override ----------------------
++alter table public.profiles
++  add column if not exists gestor_id uuid references public.profiles (id),
++  add column if not exists team_code text unique,
++  add column if not exists override_recorrente_pct integer not null default 0,
++  add column if not exists override_setup_pct integer not null default 0,
++  add column if not exists bonus_time_pct integer not null default 0,
++  add column if not exists bonus_time_setup_pct integer not null default 0;
++
++-- Consistência dos percentuais do gestor:
++--   override entre 0 e 100; bônus nunca maior que o override.
++alter table public.profiles drop constraint if exists profiles_override_valido;
++alter table public.profiles add constraint profiles_override_valido check (
++  override_recorrente_pct between 0 and 100
++  and override_setup_pct between 0 and 100
++  and bonus_time_pct between 0 and override_recorrente_pct
++  and bonus_time_setup_pct between 0 and override_setup_pct
++);
++
++create index if not exists profiles_gestor_idx on public.profiles (gestor_id);
++
++-- 4) clients: snapshot do gestor no fechamento ----------------
++alter table public.clients
++  add column if not exists gestor_id uuid references public.profiles (id),
++  add column if not exists pct_gestor_recorrente integer,
++  add column if not exists pct_gestor_setup integer;
++
++-- Trava a matemática no banco (não confia só na aplicação):
++-- seller + gestor nunca passa do teto configurado.
++create or replace function public.check_client_commission_ceiling()
++returns trigger
++language plpgsql security definer
++set search_path = public
++as $$
++declare
++  v_teto integer;
++begin
++  select coalesce(nullif(value, '')::integer, 60) into v_teto
++  from public.settings where key = 'teto_comissao_pct';
++  v_teto := coalesce(v_teto, 60);
++
++  if new.pct_recorrente + coalesce(new.pct_gestor_recorrente, 0) > v_teto then
++    raise exception 'Comissão recorrente (seller %+ gestor %) excede o teto de %',
++      new.pct_recorrente, coalesce(new.pct_gestor_recorrente, 0), v_teto;
++  end if;
++
++  if new.tem_setup
++     and coalesce(new.pct_setup, 0) + coalesce(new.pct_gestor_setup, 0) > v_teto then
++    raise exception 'Comissão de setup (seller %+ gestor %) excede o teto de %',
++      new.pct_setup, coalesce(new.pct_gestor_setup, 0), v_teto;
++  end if;
++
++  return new;
++end;
++$$;
++
++drop trigger if exists clients_check_ceiling on public.clients;
++create trigger clients_check_ceiling
++  before insert or update on public.clients
++  for each row execute function public.check_client_commission_ceiling();
++
++-- 5) commission_entries: origem (venda x override) ------------
++-- Coluna com default para não quebrar linhas já existentes.
++alter table public.commission_entries
++  add column if not exists origem public.entry_origem not null default 'venda_propria';
++
++create index if not exists entries_origem_idx
++  on public.commission_entries (seller_id, origem);
++
++-- 6) Proteção de colunas do profile (gestor não muda o próprio
++--    override; só bônus dentro do limite). Amplia o trigger já
++--    existente protect_profile_columns.
++create or replace function public.protect_profile_columns()
++returns trigger
++language plpgsql security definer
++set search_path = public
++as $$
++begin
++  if not (public.is_admin() or public.is_service_role()) then
++    -- Ninguém além do admin mexe em papel, status, código ou vínculo/override.
++    if new.role is distinct from old.role
++      or new.status is distinct from old.status
++      or new.ref_code is distinct from old.ref_code
++      or new.team_code is distinct from old.team_code
++      or new.gestor_id is distinct from old.gestor_id
++      or new.override_recorrente_pct is distinct from old.override_recorrente_pct
++      or new.override_setup_pct is distinct from old.override_setup_pct then
++      raise exception 'Somente o administrador pode alterar papel, status, código, time ou override';
++    end if;
++
++    -- Gestor pode ajustar a própria bonificação; seller não tem bônus.
++    if (new.bonus_time_pct is distinct from old.bonus_time_pct
++        or new.bonus_time_setup_pct is distinct from old.bonus_time_setup_pct)
++       and old.role <> 'gestor' then
++      raise exception 'Apenas gestores definem bonificação de time';
++    end if;
++  end if;
++  return new;
++end;
++$$;
++
++-- 7) Helpers de papel -----------------------------------------
++create or replace function public.is_active_gestor()
++returns boolean
++language sql stable security definer
++set search_path = public
++as $$
++  select exists (
++    select 1 from public.profiles
++    where id = auth.uid() and role = 'gestor' and status = 'ativo'
++  );
++$$;
++
++revoke execute on function public.is_active_gestor() from public, anon;
++grant execute on function public.is_active_gestor() to authenticated, service_role;
++
++-- 8) close_lead(): grava o snapshot do gestor ------------------
++-- Nova assinatura mantém compatibilidade: mesma lista de parâmetros.
++-- O gestor e os percentuais vêm do perfil do seller no momento do
++-- fechamento (override − bônus para o gestor; piso + bônus para o
++-- seller). Bônus é cedido pelo gestor DENTRO do próprio override,
++-- então a soma seller+gestor não muda.
++create or replace function public.close_lead(
++  p_lead_id uuid,
++  p_barbearia text,
++  p_cidade text,
++  p_mensalidade_cents integer,
++  p_dia_vencimento integer,
++  p_tem_setup boolean,
++  p_setup_cents integer default null
++)
++returns uuid
++language plpgsql security definer
++set search_path = public
++as $$
++declare
++  v_lead public.leads%rowtype;
++  v_seller public.profiles%rowtype;
++  v_gestor public.profiles%rowtype;
++  v_client_id uuid;
++  v_pct_recorrente integer;
++  v_pct_setup integer;
++  v_pct_gestor_rec integer;
++  v_pct_gestor_setup integer;
++  v_gestor_id uuid;
++  v_status public.client_status;
++begin
++  select * into v_lead from public.leads where id = p_lead_id for update;
++  if not found then
++    raise exception 'Lead não encontrado';
++  end if;
++
++  if not (
++    public.is_admin()
++    or public.is_service_role()
++    or (public.is_active_seller() and v_lead.seller_id = auth.uid())
++  ) then
++    raise exception 'Sem permissão para fechar este lead';
++  end if;
++
++  if v_lead.status not in ('novo', 'em_negociacao') then
++    raise exception 'Lead não está aberto (status atual: %)', v_lead.status;
++  end if;
++
++  if coalesce(p_mensalidade_cents, 0) <= 0 then
++    raise exception 'Valor de mensalidade inválido';
++  end if;
++  if p_dia_vencimento is null or p_dia_vencimento not between 1 and 28 then
++    raise exception 'Dia de vencimento deve estar entre 1 e 28';
++  end if;
++
++  select * into v_seller from public.profiles where id = v_lead.seller_id;
++  v_gestor_id := v_seller.gestor_id;
++  if v_gestor_id is not null then
++    select * into v_gestor from public.profiles where id = v_gestor_id;
++    -- Gestor pausado/removido: não congela override para vendas novas.
++    if v_gestor.id is null or v_gestor.status <> 'ativo' or v_gestor.role <> 'gestor' then
++      v_gestor_id := null;
++    end if;
++  end if;
++
++  if p_tem_setup then
++    if p_setup_cents is null or p_setup_cents < 50000 or p_setup_cents > 200000 then
++      raise exception 'Valor de setup deve estar entre R$ 500,00 e R$ 2.000,00';
++    end if;
++    v_pct_recorrente := 40;
++    v_pct_setup := case when p_setup_cents <= 80000 then 20 else 30 end;
++    v_status := 'aguardando_setup';
++  else
++    if p_setup_cents is not null then
++      raise exception 'Setup informado para venda sem setup';
++    end if;
++    v_pct_recorrente := 30;
++    v_pct_setup := null;
++    v_status := 'ativo';
++  end if;
++
++  -- Bonificação: gestor cede pontos ao time. Piso do seller sobe,
++  -- override do gestor cai na mesma medida — soma constante.
++  if v_gestor_id is not null then
++    v_pct_recorrente := v_pct_recorrente + coalesce(v_gestor.bonus_time_pct, 0);
++    v_pct_gestor_rec := greatest(coalesce(v_gestor.override_recorrente_pct, 0)
++                                 - coalesce(v_gestor.bonus_time_pct, 0), 0);
++    if p_tem_setup then
++      v_pct_setup := v_pct_setup + coalesce(v_gestor.bonus_time_setup_pct, 0);
++      v_pct_gestor_setup := greatest(coalesce(v_gestor.override_setup_pct, 0)
++                                     - coalesce(v_gestor.bonus_time_setup_pct, 0), 0);
++    end if;
++  end if;
++
++  update public.leads set status = 'fechado' where id = p_lead_id;
++
++  insert into public.clients (
++    lead_id, seller_id, gestor_id, barbearia, cidade, mensalidade_cents, dia_vencimento,
++    tem_setup, setup_cents, pct_recorrente, pct_setup,
++    pct_gestor_recorrente, pct_gestor_setup, status, closed_at
++  ) values (
++    p_lead_id,
++    v_lead.seller_id,
++    v_gestor_id,
++    coalesce(nullif(trim(p_barbearia), ''), v_lead.barbearia),
++    coalesce(nullif(trim(p_cidade), ''), v_lead.cidade),
++    p_mensalidade_cents,
++    p_dia_vencimento,
++    p_tem_setup,
++    p_setup_cents,
++    v_pct_recorrente,
++    v_pct_setup,
++    v_pct_gestor_rec,
++    v_pct_gestor_setup,
++    v_status,
++    now()
++  ) returning id into v_client_id;
++
++  if p_tem_setup then
++    insert into public.payments (client_id, tipo, competencia, vencimento, valor_esperado_cents, status)
++    values (v_client_id, 'setup', date_trunc('month', current_date)::date, current_date, p_setup_cents, 'aguardando');
++  end if;
++
++  return v_client_id;
++end;
++$$;
++
++-- 9) confirm_payment(): gera entry do seller E do gestor -------
++-- Arredondamento: comissões arredondam para baixo (floor); a sobra
++-- de centavos fica com o admin. Isso garante que nenhuma soma passe
++-- do valor pago e não exista centavo fantasma.
++create or replace function public.confirm_payment(
++  p_payment_id uuid,
++  p_valor_pago_cents integer default null
++)
++returns uuid
++language plpgsql security definer
++set search_path = public
++as $$
++declare
++  v_payment public.payments%rowtype;
++  v_client public.clients%rowtype;
++  v_pct integer;
++  v_pct_gestor integer;
++  v_valor_pago integer;
++  v_entry_id uuid;
++begin
++  if not (public.is_admin() or public.is_service_role()) then
++    raise exception 'Apenas o administrador pode confirmar pagamentos';
++  end if;
++
++  select * into v_payment from public.payments where id = p_payment_id for update;
++  if not found then
++    raise exception 'Cobrança não encontrada';
++  end if;
++  if v_payment.status <> 'aguardando' then
++    raise exception 'Cobrança já processada (status: %)', v_payment.status;
++  end if;
++
++  v_valor_pago := coalesce(p_valor_pago_cents, v_payment.valor_esperado_cents);
++  if v_valor_pago <= 0 then
++    raise exception 'Valor pago inválido';
++  end if;
++
++  select * into v_client from public.clients where id = v_payment.client_id for update;
++
++  update public.payments
++  set status = 'confirmado',
++      valor_pago_cents = v_valor_pago,
++      confirmed_at = now(),
++      confirmed_by = auth.uid()
++  where id = p_payment_id;
++
++  -- Entry do seller (venda própria) — floor para não estourar.
++  v_pct := case when v_payment.tipo = 'setup' then v_client.pct_setup else v_client.pct_recorrente end;
++
++  insert into public.commission_entries
++    (seller_id, client_id, payment_id, tipo, competencia, valor_cents, origem, status)
++  values (
++    v_client.seller_id,
++    v_client.id,
++    v_payment.id,
++    v_payment.tipo,
++    v_payment.competencia,
++    floor(v_valor_pago * v_pct / 100.0)::integer,
++    'venda_propria',
++    'disponivel'
++  ) returning id into v_entry_id;
++
++  -- Entry do gestor (override), na MESMA transação, se houver time.
++  if v_client.gestor_id is not null then
++    v_pct_gestor := case
++      when v_payment.tipo = 'setup' then coalesce(v_client.pct_gestor_setup, 0)
++      else coalesce(v_client.pct_gestor_recorrente, 0)
++    end;
++
++    if v_pct_gestor > 0 then
++      insert into public.commission_entries
++        (seller_id, client_id, payment_id, tipo, competencia, valor_cents, origem, status)
++      values (
++        v_client.gestor_id,
++        v_client.id,
++        v_payment.id,
++        v_payment.tipo,
++        v_payment.competencia,
++        floor(v_valor_pago * v_pct_gestor / 100.0)::integer,
++        'override_time',
++        'disponivel'
++      );
++    end if;
++  end if;
++
++  if v_payment.tipo = 'setup' and v_client.status = 'aguardando_setup' then
++    update public.clients set status = 'ativo' where id = v_client.id;
++  end if;
++
++  return v_entry_id;
++end;
++$$;
++
++-- Regrant (a assinatura de close_lead/confirm_payment não mudou,
++-- mas garantimos os grants após o replace).
++grant execute on function
++  public.close_lead(uuid, text, text, integer, integer, boolean, integer),
++  public.confirm_payment(uuid, integer)
++to authenticated, service_role;
++
++-- 10) RLS: gestor enxerga (somente leitura) o próprio time -----
++-- profiles: gestor vê os sellers vinculados a ele.
++drop policy if exists profiles_select on public.profiles;
++create policy profiles_select on public.profiles
++  for select using (
++    id = auth.uid()
++    or public.is_admin()
++    or (public.is_active_gestor() and gestor_id = auth.uid())
++  );
++
++-- leads: gestor vê (não escreve) os leads dos sellers do time.
++drop policy if exists leads_select on public.leads;
++create policy leads_select on public.leads
++  for select using (
++    public.is_admin()
++    or (public.is_active_seller() and seller_id = auth.uid())
++    or (public.is_active_gestor() and exists (
++      select 1 from public.profiles p
++      where p.id = leads.seller_id and p.gestor_id = auth.uid()
++    ))
++  );
++
++-- clients: idem.
++drop policy if exists clients_select on public.clients;
++create policy clients_select on public.clients
++  for select using (
++    public.is_admin()
++    or (public.is_active_seller() and seller_id = auth.uid())
++    or (public.is_active_gestor() and gestor_id = auth.uid())
++  );
++
++-- payments: gestor vê os pagamentos dos clientes do time.
++drop policy if exists payments_select on public.payments;
++create policy payments_select on public.payments
++  for select using (
++    public.is_admin()
++    or exists (
++      select 1 from public.clients c
++      where c.id = payments.client_id
++        and (
++          (public.is_active_seller() and c.seller_id = auth.uid())
++          or (public.is_active_gestor() and c.gestor_id = auth.uid())
++        )
++    )
++  );
++
++-- commission_entries: beneficiário (seller OU gestor) vê as suas.
++-- A coluna seller_id guarda o beneficiário; para override é o gestor.
++drop policy if exists entries_select on public.commission_entries;
++create policy entries_select on public.commission_entries
++  for select using (
++    public.is_admin()
++    or ((public.is_active_seller() or public.is_active_gestor()) and seller_id = auth.uid())
++  );
++
++-- withdrawals: gestor saca igual seller (beneficiário = seller_id).
++drop policy if exists withdrawals_select on public.withdrawals;
++create policy withdrawals_select on public.withdrawals
++  for select using (
++    public.is_admin()
++    or ((public.is_active_seller() or public.is_active_gestor()) and seller_id = auth.uid())
++  );
++
++-- settings: gestor também lê (precisa do teto/demo_url).
++drop policy if exists settings_select on public.settings;
++create policy settings_select on public.settings
++  for select using (
++    public.is_admin() or public.is_active_seller() or public.is_active_gestor()
++  );
++
++-- 11) Saque e saldo para gestor --------------------------------
++-- request_withdrawal e seller_balance passam a aceitar gestor ativo
++-- (o campo seller_id nas tabelas representa o beneficiário).
++create or replace function public.request_withdrawal(
++  p_valor_cents integer,
++  p_pix_key text,
++  p_pix_name text
++)
++returns uuid
++language plpgsql security definer
++set search_path = public
++as $$
++declare
++  v_seller_id uuid := auth.uid();
++  v_minimo integer;
++  v_saldo bigint;
++  v_withdrawal_id uuid;
++  v_restante integer;
++  r record;
++begin
++  if not (public.is_active_seller() or public.is_active_gestor()) then
++    raise exception 'Apenas parceiros ativos podem solicitar saque';
++  end if;
++  if nullif(trim(coalesce(p_pix_key, '')), '') is null then
++    raise exception 'Informe a chave PIX';
++  end if;
++  if nullif(trim(coalesce(p_pix_name, '')), '') is null then
++    raise exception 'Informe o nome completo do titular da chave';
++  end if;
++
++  select coalesce(nullif(value, '')::integer, 5000) into v_minimo
++  from public.settings where key = 'saque_minimo_cents';
++  v_minimo := coalesce(v_minimo, 5000);
++
++  if coalesce(p_valor_cents, 0) < v_minimo then
++    raise exception 'O saque mínimo é de R$ %', to_char(v_minimo / 100.0, 'FM999G999G990D00');
++  end if;
++
++  perform 1 from public.commission_entries
++  where seller_id = v_seller_id and status = 'disponivel' and withdrawal_id is null
++  for update;
++
++  select coalesce(sum(valor_cents), 0) into v_saldo
++  from public.commission_entries
++  where seller_id = v_seller_id and status = 'disponivel' and withdrawal_id is null;
++
++  if p_valor_cents > v_saldo then
++    raise exception 'Valor solicitado maior que o saldo disponível';
++  end if;
++
++  update public.profiles
++  set pix_key = p_pix_key, pix_name = p_pix_name
++  where id = v_seller_id;
++
++  insert into public.withdrawals (seller_id, valor_cents, pix_key, pix_name, status)
++  values (v_seller_id, p_valor_cents, p_pix_key, p_pix_name, 'solicitado')
++  returning id into v_withdrawal_id;
++
++  v_restante := p_valor_cents;
++  for r in
++    select id, valor_cents from public.commission_entries
++    where seller_id = v_seller_id and status = 'disponivel' and withdrawal_id is null
++    order by created_at, id
++  loop
++    exit when v_restante <= 0;
++    if r.valor_cents <= v_restante then
++      update public.commission_entries set withdrawal_id = v_withdrawal_id where id = r.id;
++      v_restante := v_restante - r.valor_cents;
++    else
++      update public.commission_entries
++      set valor_cents = v_restante, withdrawal_id = v_withdrawal_id
++      where id = r.id;
++      insert into public.commission_entries
++        (seller_id, client_id, payment_id, tipo, competencia, valor_cents, origem, status, created_at)
++      select seller_id, client_id, payment_id, tipo, competencia,
++             r.valor_cents - v_restante, origem, 'disponivel', created_at
++      from public.commission_entries where id = r.id;
++      v_restante := 0;
++    end if;
++  end loop;
++
++  return v_withdrawal_id;
++end;
++$$;
++
++create or replace function public.seller_balance(p_seller_id uuid default null)
++returns bigint
++language sql stable security definer
++set search_path = public
++as $$
++  select coalesce(sum(valor_cents), 0)
++  from public.commission_entries
++  where seller_id = coalesce(p_seller_id, auth.uid())
++    and status = 'disponivel'
++    and withdrawal_id is null
++    and (public.is_admin() or seller_id = auth.uid());
++$$;
++
++grant execute on function
++  public.request_withdrawal(integer, text, text),
++  public.seller_balance(uuid)
++to authenticated, service_role;
++
++-- 12) Vínculo do seller ao time no cadastro --------------------
++-- Resolve o team_code informado no signup e grava gestor_id.
++-- Chamada pela server action após o signUp. SECURITY DEFINER para
++-- poder escrever gestor_id (protegido pelo trigger de colunas).
++create or replace function public.join_team(p_team_code text)
++returns boolean
++language plpgsql security definer
++set search_path = public
++as $$
++declare
++  v_gestor_id uuid;
++begin
++  if nullif(trim(coalesce(p_team_code, '')), '') is null then
++    return false;
++  end if;
++
++  select id into v_gestor_id
++  from public.profiles
++  where lower(team_code) = lower(trim(p_team_code))
++    and role = 'gestor' and status = 'ativo';
++
++  if v_gestor_id is null then
++    raise exception 'Código de time inválido';
++  end if;
++
++  update public.profiles
++  set gestor_id = v_gestor_id
++  where id = auth.uid();
++
++  return true;
++end;
++$$;
++
++revoke execute on function public.join_team(text) from public, anon;
++grant execute on function public.join_team(text) to authenticated, service_role;

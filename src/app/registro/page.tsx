@@ -88,6 +88,22 @@ export default function RegistroPage() {
                     required
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="team_code">
+                    Código do time{" "}
+                    <span className="text-muted-foreground">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="team_code"
+                    name="team_code"
+                    placeholder="Ex.: TIMECARLOS"
+                    autoCapitalize="characters"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Recebeu um código de um gestor? Informe aqui para entrar no
+                    time dele. Deixe em branco se não tiver.
+                  </p>
+                </div>
 
                 {state?.error && (
                   <Alert variant="destructive">

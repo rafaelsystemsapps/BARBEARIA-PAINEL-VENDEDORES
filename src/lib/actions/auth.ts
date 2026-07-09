@@ -27,6 +27,7 @@ const signUpSchema = z.object({
   email: z.string().trim().email("E-mail inválido."),
   whatsapp: z.string().trim().min(10, "Informe o WhatsApp com DDD."),
   password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres."),
+  team_code: z.string().trim().optional(),
 });
 
 export async function signUp(
@@ -38,12 +39,13 @@ export async function signUp(
     email: formData.get("email"),
     whatsapp: formData.get("whatsapp"),
     password: formData.get("password"),
+    team_code: formData.get("team_code"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const { nome, email, whatsapp, password } = parsed.data;
+  const { nome, email, whatsapp, password, team_code } = parsed.data;
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -56,6 +58,20 @@ export async function signUp(
       return { error: "Este e-mail já está cadastrado. Faça login." };
     }
     return { error: `Não foi possível concluir o cadastro: ${error.message}` };
+  }
+
+  // Se informou código de time e já há sessão, tenta vincular ao gestor.
+  // Código inválido NÃO bloqueia o cadastro — apenas não vincula.
+  if (data.session && team_code) {
+    const { error: teamErr } = await supabase.rpc("join_team", {
+      p_team_code: team_code,
+    });
+    if (teamErr) {
+      return {
+        error:
+          "Cadastro criado, mas o código de time é inválido. Peça o código correto ao seu gestor — o administrador também pode vincular você depois. Faça login para continuar.",
+      };
+    }
   }
 
   // Sem confirmação de e-mail, o signUp já cria a sessão e o cadastro vai
