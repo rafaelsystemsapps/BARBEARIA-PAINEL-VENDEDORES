@@ -157,6 +157,8 @@ export async function requestWithdrawal(
 
   revalidatePath("/saques");
   revalidatePath("/dashboard");
+  revalidatePath("/gestor/saques");
+  revalidatePath("/gestor");
   return { success: "Saque solicitado! Você receberá na chave PIX informada." };
 }
 
@@ -198,5 +200,6 @@ export async function updateProfile(
   if (error) return { error: `Não foi possível salvar: ${error.message}` };
 
   revalidatePath("/perfil");
+  revalidatePath("/gestor/perfil");
   return { success: "Perfil atualizado." };
 }

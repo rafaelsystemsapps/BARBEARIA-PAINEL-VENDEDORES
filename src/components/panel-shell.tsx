@@ -52,6 +52,8 @@ const ADMIN_NAV: NavItem[] = [
 const GESTOR_NAV: NavItem[] = [
   { href: "/gestor", label: "Meu time", icon: UsersRound, exact: true },
   { href: "/gestor/comissoes", label: "Comissões", icon: Coins },
+  { href: "/gestor/saques", label: "Saques", icon: Banknote },
+  { href: "/gestor/perfil", label: "Perfil", icon: UserRound },
 ];
 
 export function PanelShell({
