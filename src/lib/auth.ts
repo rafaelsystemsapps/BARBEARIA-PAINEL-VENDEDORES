@@ -23,6 +23,17 @@ export async function requireSeller(): Promise<Profile> {
   const profile = await getProfile();
   if (!profile) redirect("/login");
   if (profile.role === "admin") redirect("/admin");
+  if (profile.role === "gestor") redirect("/gestor");
+  if (profile.status !== "ativo") redirect("/aguardando-aprovacao");
+  return profile;
+}
+
+/** Garante gestor ativo; redireciona caso contrário. */
+export async function requireGestor(): Promise<Profile> {
+  const profile = await getProfile();
+  if (!profile) redirect("/login");
+  if (profile.role === "admin") redirect("/admin");
+  if (profile.role !== "gestor") redirect("/");
   if (profile.status !== "ativo") redirect("/aguardando-aprovacao");
   return profile;
 }

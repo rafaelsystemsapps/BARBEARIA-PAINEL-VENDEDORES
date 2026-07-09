@@ -5,5 +5,11 @@ export default async function Home() {
   const profile = await getProfile();
   if (!profile) redirect("/login");
   if (profile.status !== "ativo") redirect("/aguardando-aprovacao");
-  redirect(profile.role === "admin" ? "/admin" : "/dashboard");
+  redirect(
+    profile.role === "admin"
+      ? "/admin"
+      : profile.role === "gestor"
+        ? "/gestor"
+        : "/dashboard"
+  );
 }

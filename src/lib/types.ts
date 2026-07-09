@@ -1,8 +1,9 @@
 // Tipos espelhando o schema do banco (supabase/migrations).
 // Valores monetários sempre em centavos (number inteiro).
 
-export type Role = "admin" | "seller";
+export type Role = "admin" | "gestor" | "seller";
 export type ProfileStatus = "pendente" | "ativo" | "pausado";
+export type EntryOrigem = "venda_propria" | "override_time";
 export type LeadStatus = "novo" | "em_negociacao" | "fechado" | "perdido";
 export type ClientStatus = "aguardando_setup" | "ativo" | "inadimplente" | "cancelado";
 export type PaymentTipo = "setup" | "mensalidade";
@@ -20,6 +21,13 @@ export interface Profile {
   pix_name: string | null;
   ref_code: string | null;
   status: ProfileStatus;
+  // Camada de gestor (times)
+  gestor_id: string | null;
+  team_code: string | null;
+  override_recorrente_pct: number;
+  override_setup_pct: number;
+  bonus_time_pct: number;
+  bonus_time_setup_pct: number;
   created_at: string;
   updated_at: string;
 }
@@ -50,6 +58,9 @@ export interface Client {
   setup_cents: number | null;
   pct_recorrente: number;
   pct_setup: number | null;
+  gestor_id: string | null;
+  pct_gestor_recorrente: number | null;
+  pct_gestor_setup: number | null;
   status: ClientStatus;
   closed_at: string;
   created_at: string;
@@ -78,6 +89,7 @@ export interface CommissionEntry {
   tipo: PaymentTipo;
   competencia: string;
   valor_cents: number;
+  origem: EntryOrigem;
   status: EntryStatus;
   withdrawal_id: string | null;
   created_at: string;

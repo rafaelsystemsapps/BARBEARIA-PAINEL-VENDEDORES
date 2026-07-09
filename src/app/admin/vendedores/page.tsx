@@ -9,13 +9,18 @@ export default async function VendedoresPage() {
   await requireAdmin();
   const supabase = await createClient();
 
-  const [sellersRes, clientsRes] = await Promise.all([
+  const [sellersRes, clientsRes, gestoresRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("*")
       .eq("role", "seller")
       .order("created_at", { ascending: false }),
     supabase.from("clients").select("id, seller_id, status, mensalidade_cents"),
+    supabase
+      .from("profiles")
+      .select("id, nome, email, team_code, status")
+      .eq("role", "gestor")
+      .order("nome"),
   ]);
 
   return (
@@ -25,6 +30,12 @@ export default async function VendedoresPage() {
         (clientsRes.data ?? []) as Pick<
           Client,
           "id" | "seller_id" | "status" | "mensalidade_cents"
+        >[]
+      }
+      gestores={
+        (gestoresRes.data ?? []) as Pick<
+          Profile,
+          "id" | "nome" | "email" | "team_code" | "status"
         >[]
       }
     />

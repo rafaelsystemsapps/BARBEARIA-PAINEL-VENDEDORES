@@ -2,9 +2,27 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { BadgeCheck, MoreHorizontal, Pause, Play, Store } from "lucide-react";
+import {
+  BadgeCheck,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Store,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
-import { approveSeller, setSellerStatus } from "@/lib/actions/admin";
+import {
+  approveSeller,
+  setSellerStatus,
+  setSellerTeam,
+} from "@/lib/actions/admin";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ActionState } from "@/lib/actions/auth";
 import type { Client, Profile } from "@/lib/types";
 import { formatBRL, formatDate } from "@/lib/format";
@@ -37,16 +55,22 @@ import {
 } from "@/components/ui/table";
 
 type ClientLite = Pick<Client, "id" | "seller_id" | "status" | "mensalidade_cents">;
+type GestorLite = Pick<Profile, "id" | "nome" | "email" | "team_code" | "status">;
 
 export function VendedoresClient({
   sellers,
   clients,
+  gestores,
 }: {
   sellers: Profile[];
   clients: ClientLite[];
+  gestores: GestorLite[];
 }) {
   const [approving, setApproving] = useState<Profile | null>(null);
+  const [linking, setLinking] = useState<Profile | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const gestorById = new Map(gestores.map((g) => [g.id, g]));
 
   function toggleStatus(seller: Profile) {
     const novo = seller.status === "pausado" ? "ativo" : "pausado";
@@ -88,6 +112,7 @@ export function VendedoresClient({
                 <TableHead>Vendedor</TableHead>
                 <TableHead className="hidden md:table-cell">Contato</TableHead>
                 <TableHead className="hidden sm:table-cell">Código</TableHead>
+                <TableHead className="hidden md:table-cell">Time / Gestor</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden lg:table-cell text-right">
                   Carteira
@@ -116,6 +141,20 @@ export function VendedoresClient({
                         </code>
                       ) : (
                         "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {s.gestor_id && gestorById.has(s.gestor_id) ? (
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {gestorById.get(s.gestor_id)!.nome}
+                          </span>
+                          <code className="rounded bg-muted px-1.5 py-0.5 text-xs w-fit">
+                            {gestorById.get(s.gestor_id)!.team_code}
+                          </code>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Direto</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -162,6 +201,10 @@ export function VendedoresClient({
                               Reativar
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem onClick={() => setLinking(s)}>
+                            <Users className="size-4" />
+                            Gerenciar time…
+                          </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link href={`/admin/vendedores/${s.id}`}>
                               <Store className="size-4" />
@@ -179,7 +222,97 @@ export function VendedoresClient({
       )}
 
       <ApproveDialog seller={approving} onOpenChange={() => setApproving(null)} />
+      <LinkTeamDialog
+        seller={linking}
+        gestores={gestores}
+        onOpenChange={() => setLinking(null)}
+      />
     </div>
+  );
+}
+
+function LinkTeamDialog({
+  seller,
+  gestores,
+  onOpenChange,
+}: {
+  seller: Profile | null;
+  gestores: GestorLite[];
+  onOpenChange: () => void;
+}) {
+  if (!seller) return null;
+  return (
+    <LinkTeamDialogContent
+      key={seller.id}
+      seller={seller}
+      gestores={gestores}
+      onOpenChange={onOpenChange}
+    />
+  );
+}
+
+function LinkTeamDialogContent({
+  seller,
+  gestores,
+  onOpenChange,
+}: {
+  seller: Profile;
+  gestores: GestorLite[];
+  onOpenChange: () => void;
+}) {
+  const [value, setValue] = useState<string>(seller.gestor_id ?? "none");
+  const [pending, startTransition] = useTransition();
+
+  const activeGestores = gestores.filter((g) => g.status === "ativo");
+
+  function save() {
+    startTransition(async () => {
+      const res = await setSellerTeam(
+        seller.id,
+        value === "none" ? null : value
+      );
+      if (res?.error) toast.error(res.error);
+      else {
+        toast.success(res?.success ?? "Atualizado.");
+        onOpenChange();
+      }
+    });
+  }
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-heading">Time do vendedor</DialogTitle>
+          <DialogDescription>
+            {seller.nome || seller.email} — vincule a um gestor, transfira de
+            time ou deixe como vendedor direto. Vale para vendas futuras; os
+            clientes já fechados mantêm o gestor registrado no fechamento.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Gestor / time</Label>
+            <Select value={value} onValueChange={setValue}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem time (vendedor direto)</SelectItem>
+                {activeGestores.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.nome} — {g.team_code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={save} className="w-full" disabled={pending}>
+            {pending ? "Salvando..." : "Salvar vínculo"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
