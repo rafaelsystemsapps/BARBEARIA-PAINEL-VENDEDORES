@@ -8,10 +8,12 @@ export default async function ClientesPage() {
   await requireAdmin();
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("clients")
-    .select("*, profiles(nome)")
+    .select("*, profiles!clients_seller_id_fkey(nome)")
     .order("closed_at", { ascending: false });
+
+  if (error) console.error("Erro ao carregar clientes:", error.message);
 
   return <ClientesClient clients={(data ?? []) as unknown as ClientRow[]} />;
 }

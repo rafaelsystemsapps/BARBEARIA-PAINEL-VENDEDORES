@@ -11,12 +11,16 @@ export default async function PagamentosPage() {
   const [pendingRes, recentRes, diasRes] = await Promise.all([
     supabase
       .from("payments")
-      .select("*, clients(barbearia, profiles(nome))")
+      .select(
+        "*, clients(barbearia, profiles!clients_seller_id_fkey(nome))"
+      )
       .eq("status", "aguardando")
       .order("vencimento", { ascending: true }),
     supabase
       .from("payments")
-      .select("*, clients(barbearia, profiles(nome))")
+      .select(
+        "*, clients(barbearia, profiles!clients_seller_id_fkey(nome))"
+      )
       .eq("status", "confirmado")
       .order("confirmed_at", { ascending: false })
       .limit(10),
@@ -28,6 +32,15 @@ export default async function PagamentosPage() {
   ]);
 
   const diasAlerta = parseInt(diasRes.data?.value ?? "7", 10) || 7;
+
+  // Não engolir erros silenciosamente: se a query falhar (ex.: join
+  // ambíguo), registrar para não virar "lista vazia" sem explicação.
+  if (pendingRes.error) {
+    console.error("Erro ao carregar cobranças pendentes:", pendingRes.error.message);
+  }
+  if (recentRes.error) {
+    console.error("Erro ao carregar cobranças confirmadas:", recentRes.error.message);
+  }
 
   return (
     <PagamentosClient
