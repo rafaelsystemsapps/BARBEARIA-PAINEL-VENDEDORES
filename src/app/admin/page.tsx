@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AlertTriangle, Banknote, Coins, Store, TrendingUp } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -172,9 +173,9 @@ export default async function AdminHomePage() {
             <p>
               <span className="font-medium">{pendentesAprovacao} vendedor(es)</span>{" "}
               aguardando aprovação em{" "}
-              <a href="/admin/vendedores" className="text-primary hover:underline">
+              <Link href="/admin/vendedores" className="text-primary hover:underline">
                 Vendedores
-              </a>
+              </Link>
               .
             </p>
           </CardContent>

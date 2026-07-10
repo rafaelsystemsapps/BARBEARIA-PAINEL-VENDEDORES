@@ -157,7 +157,11 @@ export function LeadsClient({ leads }: { leads: Lead[] }) {
 
       <NewLeadDialog open={newOpen} onOpenChange={setNewOpen} />
       <LoseLeadDialog lead={losing} onOpenChange={() => setLosing(null)} />
-      <CloseLeadDialog lead={closing} onOpenChange={() => setClosing(null)} />
+      <CloseLeadDialog
+        key={closing?.id}
+        lead={closing}
+        onOpenChange={() => setClosing(null)}
+      />
     </div>
   );
 }
@@ -345,6 +349,8 @@ function CloseLeadDialog({
     closeLead,
     null
   );
+  // Reinicia a cada lead: o `key={closing?.id}` no componente pai remonta
+  // este dialog por lead, então o estado nasce zerado sem efeito colateral.
   const [temSetup, setTemSetup] = useState(false);
 
   useEffect(() => {
@@ -354,10 +360,6 @@ function CloseLeadDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
-
-  useEffect(() => {
-    if (lead) setTemSetup(false);
-  }, [lead]);
 
   if (!lead) return null;
 
