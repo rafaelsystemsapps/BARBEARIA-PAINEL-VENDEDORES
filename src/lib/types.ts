@@ -5,7 +5,12 @@ export type Role = "admin" | "gestor" | "seller";
 export type ProfileStatus = "pendente" | "ativo" | "pausado";
 export type EntryOrigem = "venda_propria" | "override_time";
 export type LeadStatus = "novo" | "em_negociacao" | "fechado" | "perdido";
-export type ClientStatus = "aguardando_setup" | "ativo" | "inadimplente" | "cancelado";
+export type ClientStatus =
+  | "aguardando_setup"
+  | "aguardando_pagamento"
+  | "ativo"
+  | "inadimplente"
+  | "cancelado";
 export type PaymentTipo = "setup" | "mensalidade";
 export type PaymentStatus = "aguardando" | "confirmado" | "cancelado";
 export type EntryStatus = "disponivel" | "sacada" | "estornada";

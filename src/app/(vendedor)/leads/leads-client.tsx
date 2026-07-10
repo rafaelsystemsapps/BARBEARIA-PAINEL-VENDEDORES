@@ -400,7 +400,7 @@ function CloseLeadDialog({
                   <SelectValue placeholder="Dia" />
                 </SelectTrigger>
                 <SelectContent className="max-h-64">
-                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                     <SelectItem key={d} value={String(d)}>
                       Dia {d}
                     </SelectItem>

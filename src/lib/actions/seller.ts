@@ -82,8 +82,8 @@ const closeSchema = z.object({
   dia_vencimento: z.coerce
     .number()
     .int()
-    .min(1, "Dia de vencimento entre 1 e 28.")
-    .max(28, "Dia de vencimento entre 1 e 28."),
+    .min(1, "Dia de vencimento entre 1 e 31.")
+    .max(31, "Dia de vencimento entre 1 e 31."),
   tem_setup: z.coerce.boolean(),
   setup_cents: z.coerce.number().int().optional(),
 });
@@ -126,7 +126,10 @@ export async function closeLead(
   revalidatePath("/leads");
   revalidatePath("/carteira");
   revalidatePath("/dashboard");
-  return { success: "Venda fechada! O cliente entrou na sua carteira." };
+  return {
+    success:
+      "Venda fechada! Aguardando o administrador confirmar o pagamento — a comissão entra assim que ele confirmar.",
+  };
 }
 
 const withdrawalSchema = z.object({

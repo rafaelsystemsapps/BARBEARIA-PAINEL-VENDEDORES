@@ -20,6 +20,7 @@ const LABELS: Record<string, { label: string; tone: Tone }> = {
   perdido: { label: "Perdido", tone: "bad" },
   // clientes
   aguardando_setup: { label: "Aguardando setup", tone: "warn" },
+  aguardando_pagamento: { label: "Aguardando pagamento", tone: "warn" },
   ativo: { label: "Ativo", tone: "ok" },
   inadimplente: { label: "Inadimplente", tone: "bad" },
   cancelado: { label: "Cancelado", tone: "muted" },

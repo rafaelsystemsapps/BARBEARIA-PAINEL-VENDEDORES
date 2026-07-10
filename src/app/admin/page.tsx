@@ -27,28 +27,57 @@ export default async function AdminHomePage() {
   const supabase = await createClient();
   const competencia = currentCompetencia();
 
-  const [clientsRes, entriesRes, sellersRes, withdrawalsRes] = await Promise.all([
-    supabase.from("clients").select("*"),
-    supabase
-      .from("commission_entries")
-      .select("seller_id, valor_cents")
-      .eq("competencia", competencia),
-    supabase.from("profiles").select("*").eq("role", "seller"),
-    supabase.from("withdrawals").select("*").eq("status", "solicitado"),
-  ]);
+  const [clientsRes, entriesRes, sellersRes, withdrawalsRes, paymentsRes] =
+    await Promise.all([
+      supabase.from("clients").select("*"),
+      supabase
+        .from("commission_entries")
+        .select("seller_id, valor_cents, origem")
+        .eq("competencia", competencia),
+      supabase.from("profiles").select("*").eq("role", "seller"),
+      supabase.from("withdrawals").select("*").eq("status", "solicitado"),
+      // Pagamentos confirmados na competência: base para calcular a
+      // parte do admin (o que sobra depois de seller + gestor).
+      supabase
+        .from("payments")
+        .select("valor_pago_cents")
+        .eq("status", "confirmado")
+        .eq("competencia", competencia),
+    ]);
 
   const clients = (clientsRes.data ?? []) as Client[];
   const entries = (entriesRes.data ?? []) as Pick<
     CommissionEntry,
-    "seller_id" | "valor_cents"
+    "seller_id" | "valor_cents" | "origem"
   >[];
   const sellers = (sellersRes.data ?? []) as Profile[];
   const pendingWithdrawals = (withdrawalsRes.data ?? []) as Withdrawal[];
+  const payments = (paymentsRes.data ?? []) as {
+    valor_pago_cents: number | null;
+  }[];
 
   const ativos = clients.filter((c) => c.status === "ativo");
   const inadimplentes = clients.filter((c) => c.status === "inadimplente");
+  const aguardando = clients.filter(
+    (c) => c.status === "aguardando_pagamento" || c.status === "aguardando_setup"
+  );
   const mrr = ativos.reduce((s, c) => s + c.mensalidade_cents, 0);
-  const comissoesMes = entries.reduce((s, e) => s + e.valor_cents, 0);
+
+  // Repartição do mês: comissões de vendedores, override de gestores,
+  // e a parte do admin (recebido − o que foi pago aos parceiros).
+  const comissaoSellers = entries
+    .filter((e) => e.origem !== "override_time")
+    .reduce((s, e) => s + e.valor_cents, 0);
+  const overrideGestores = entries
+    .filter((e) => e.origem === "override_time")
+    .reduce((s, e) => s + e.valor_cents, 0);
+  const comissoesMes = comissaoSellers + overrideGestores;
+  const recebidoMes = payments.reduce(
+    (s, p) => s + (p.valor_pago_cents ?? 0),
+    0
+  );
+  const minhaParte = Math.max(recebidoMes - comissoesMes, 0);
+
   const saquesPendentes = pendingWithdrawals.reduce((s, w) => s + w.valor_cents, 0);
   const pendentesAprovacao = sellers.filter((s) => s.status === "pendente").length;
 
@@ -86,13 +115,34 @@ export default async function AdminHomePage() {
         <StatCard
           label="MRR total"
           value={formatBRL(mrr)}
-          hint={`${ativos.length} clientes ativos`}
+          hint={`${ativos.length} ativos · ${aguardando.length} aguardando pgto`}
           icon={TrendingUp}
         />
         <StatCard
-          label="Comissões do mês"
+          label="Minha parte no mês"
+          value={formatBRL(minhaParte)}
+          hint={`De ${formatBRL(recebidoMes)} recebido`}
+          icon={TrendingUp}
+        />
+        <StatCard
+          label="Comissões de vendedores"
+          value={formatBRL(comissaoSellers)}
+          hint="Competência atual"
+          icon={Coins}
+        />
+        <StatCard
+          label="Override de gestores"
+          value={formatBRL(overrideGestores)}
+          hint="Competência atual"
+          icon={Coins}
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Total pago a parceiros"
           value={formatBRL(comissoesMes)}
-          hint="Geradas na competência atual"
+          hint="Vendedores + gestores"
           icon={Coins}
         />
         <StatCard
@@ -106,6 +156,12 @@ export default async function AdminHomePage() {
           value={formatBRL(saquesPendentes)}
           hint={`${pendingWithdrawals.length} solicitação(ões)`}
           icon={Banknote}
+        />
+        <StatCard
+          label="Aguardando pagamento"
+          value={String(aguardando.length)}
+          hint="Vendas fechadas a confirmar"
+          icon={AlertTriangle}
         />
       </div>
 
