@@ -12,14 +12,14 @@ export default async function PagamentosPage() {
     supabase
       .from("payments")
       .select(
-        "*, clients(barbearia, profiles!clients_seller_id_fkey(nome))"
+        "*, clients(barbearia, dia_vencimento, profiles!clients_seller_id_fkey(nome))"
       )
       .eq("status", "aguardando")
       .order("vencimento", { ascending: true }),
     supabase
       .from("payments")
       .select(
-        "*, clients(barbearia, profiles!clients_seller_id_fkey(nome))"
+        "*, clients(barbearia, dia_vencimento, profiles!clients_seller_id_fkey(nome))"
       )
       .eq("status", "confirmado")
       .order("confirmed_at", { ascending: false })

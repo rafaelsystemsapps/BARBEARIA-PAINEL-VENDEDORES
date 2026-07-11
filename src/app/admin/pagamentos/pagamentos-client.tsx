@@ -32,7 +32,11 @@ import {
 } from "@/components/ui/table";
 
 export type PaymentRow = Payment & {
-  clients: { barbearia: string; profiles: { nome: string } | null } | null;
+  clients: {
+    barbearia: string;
+    dia_vencimento: number | null;
+    profiles: { nome: string } | null;
+  } | null;
 };
 
 function diasVencidos(vencimento: string): number {
@@ -238,6 +242,27 @@ function ConfirmDialog({
               required
             />
           </div>
+
+          {payment.tipo === "mensalidade" && (
+            <div className="space-y-2">
+              <Label htmlFor="cp-dia">Dia de vencimento da mensalidade</Label>
+              <input
+                id="cp-dia"
+                name="dia_vencimento"
+                type="number"
+                min={1}
+                max={31}
+                required
+                defaultValue={payment.clients?.dia_vencimento ?? ""}
+                placeholder="Ex.: 10"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground">
+                Este será o dia fixo de vencimento nos próximos meses. Em meses
+                mais curtos, ajusta para o último dia.
+              </p>
+            </div>
+          )}
 
           {state?.error && (
             <Alert variant="destructive">

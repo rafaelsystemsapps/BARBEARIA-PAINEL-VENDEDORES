@@ -79,11 +79,6 @@ const closeSchema = z.object({
     .number()
     .int()
     .positive("Informe o valor da mensalidade."),
-  dia_vencimento: z.coerce
-    .number()
-    .int()
-    .min(1, "Dia de vencimento entre 1 e 31.")
-    .max(31, "Dia de vencimento entre 1 e 31."),
   tem_setup: z.coerce.boolean(),
   setup_cents: z.coerce.number().int().optional(),
 });
@@ -97,7 +92,6 @@ export async function closeLead(
     barbearia: formData.get("barbearia"),
     cidade: formData.get("cidade"),
     mensalidade_cents: formData.get("mensalidade_cents"),
-    dia_vencimento: formData.get("dia_vencimento"),
     tem_setup: formData.get("tem_setup") === "on",
     setup_cents: formData.get("setup_cents") ?? undefined,
   });
@@ -116,7 +110,6 @@ export async function closeLead(
     p_barbearia: d.barbearia,
     p_cidade: d.cidade || null,
     p_mensalidade_cents: d.mensalidade_cents,
-    p_dia_vencimento: d.dia_vencimento,
     p_tem_setup: d.tem_setup,
     p_setup_cents: d.tem_setup ? d.setup_cents : null,
   });

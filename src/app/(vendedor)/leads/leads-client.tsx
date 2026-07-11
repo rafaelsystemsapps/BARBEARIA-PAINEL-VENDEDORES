@@ -41,13 +41,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   TableBody,
   TableCell,
   TableHead,
@@ -395,22 +388,12 @@ function CloseLeadDialog({
               <Label htmlFor="cl-mensalidade">Mensalidade acordada</Label>
               <MoneyInput id="cl-mensalidade" name="mensalidade_cents" required />
             </div>
-            <div className="space-y-2">
-              <Label>Dia de vencimento</Label>
-              <Select name="dia_vencimento" required defaultValue="5">
-                <SelectTrigger>
-                  <SelectValue placeholder="Dia" />
-                </SelectTrigger>
-                <SelectContent className="max-h-64">
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      Dia {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
+
+          <p className="rounded-lg border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
+            O dia de vencimento da mensalidade é definido pelo administrador
+            quando ele confirmar o primeiro pagamento.
+          </p>
 
           <div className="rounded-lg border p-4">
             <div className="flex items-center justify-between gap-3">

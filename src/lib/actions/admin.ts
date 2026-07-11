@@ -78,10 +78,16 @@ export async function confirmPayment(
   const valorRaw = parseInt(String(formData.get("valor_pago_cents") ?? "0"), 10);
   const valor = Number.isFinite(valorRaw) && valorRaw > 0 ? valorRaw : null;
 
+  // Dia de vencimento: obrigatório ao confirmar mensalidade; o banco
+  // valida. Enviado só quando o formulário o inclui (tipo mensalidade).
+  const diaRaw = parseInt(String(formData.get("dia_vencimento") ?? ""), 10);
+  const dia = Number.isFinite(diaRaw) && diaRaw >= 1 && diaRaw <= 31 ? diaRaw : null;
+
   const supabase = await createClient();
   const { error } = await supabase.rpc("confirm_payment", {
     p_payment_id: paymentId,
     p_valor_pago_cents: valor,
+    p_dia_vencimento: dia,
   });
 
   if (error) return { error: error.message };
