@@ -7,6 +7,7 @@ import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
 import { DemoLinkCard } from "@/components/demo-link-card";
 import { CopyButton } from "@/components/copy-button";
+import { mensagemPix } from "@/lib/messages";
 import {
   Card,
   CardContent,
@@ -121,8 +122,15 @@ export default async function DashboardPage() {
               <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                 {adminPixKey}
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                O botão copia uma mensagem pronta com a chave — é só colar no
+                WhatsApp do cliente.
+              </p>
             </div>
-            <CopyButton value={adminPixKey} label="Copiar chave" />
+            <CopyButton
+              value={mensagemPix(adminPixKey)}
+              label="Copiar mensagem"
+            />
           </CardContent>
         </Card>
       )}
