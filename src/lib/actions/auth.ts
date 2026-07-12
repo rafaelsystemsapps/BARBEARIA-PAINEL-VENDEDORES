@@ -27,7 +27,7 @@ const signUpSchema = z.object({
   email: z.string().trim().email("E-mail inválido."),
   whatsapp: z.string().trim().min(10, "Informe o WhatsApp com DDD."),
   password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres."),
-  team_code: z.string().trim().optional(),
+  team_code: z.string().trim().toUpperCase().optional(),
 });
 
 export async function signUp(

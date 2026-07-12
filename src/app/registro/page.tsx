@@ -98,6 +98,7 @@ export default function RegistroPage() {
                     name="team_code"
                     placeholder="Ex.: TIMECARLOS"
                     autoCapitalize="characters"
+                    className="uppercase placeholder:normal-case"
                   />
                   <p className="text-xs text-muted-foreground">
                     Recebeu um código de um gestor? Informe aqui para entrar no
